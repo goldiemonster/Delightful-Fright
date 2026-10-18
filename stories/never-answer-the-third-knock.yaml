@@ -1,43 +1,78 @@
-# One line = one caption beat + one background shot.
-# Wrap words in *asterisks* to show them in red.
-# `visual` is a Pexels search term, or a file in assets/ (e.g. images/my-painting.jpg).
-# `impact: true` adds a low boom when that line starts (the hook always gets one).
+# One line = one caption beat + one shot. Aim for 60–75 seconds (about 160–190 words).
+#
+#   text:    what the narrator says. Wrap words in *asterisks* to show them in red.
+#   scene:   what the AI should paint for this shot (free, no key needed).
+#   visual:  optional: a file in assets/ (e.g. images/my-painting.jpg), or a Pexels search.
+#   impact:  true = riser + boom + flash + camera shake when the line starts (the hook always gets one).
+#   sfx:     knock | heartbeat | bell | static | whoosh | boom | riser (one or a list)
+#   pause:   seconds of silence after the line.
+#   move:    push_in | pull_out | drift_left | drift_right | rise | sink (default: varies per shot)
 
 title: Never Answer the Third Knock
-voice: bm_george   # deep British male. Others: bm_lewis, am_michael, am_onyx, af_nicole
-speed: 0.92
+voice: bm_george:0.7,am_onyx:0.3   # blend Kokoro voices; or one, e.g. bm_george, am_onyx, bm_lewis
+speed: 0.9
+grade: amber          # amber (warm, low-key) | cold | green
+music: auto           # auto = generated score; or assets/music/your-track.mp3; or none
+# style: optional art direction added to every scene prompt (defaults to dark cinematic photoreal)
 
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.
-    visual: old wooden door dark
+    scene: close-up of an elderly woman's wrinkled hand resting on an old brass door handle, candlelight, dark farmhouse hallway
   - text: The first knock is the wind. The second is the house settling.
-    visual: dark hallway night
+    scene: heavy wooden front door of an old farmhouse at night, seen from inside a dark hallway, thin moonlight under the door
+    sfx: knock
   - text: The third knock is something that *learned* how to knock.
-    visual: window rain night
-  - text: She died in March. Last week, I moved into her house.
-    visual: abandoned house
-  - text: Last night, I heard one knock. Then two.
-    visual: candle in darkness
-  - text: I held my breath, and waited for the third.
-    visual: dark staircase
-  - text: It never came.
-    visual: foggy forest night
+    scene: extreme close-up of weathered wooden door panel with deep scratch marks, lit by a single oil lamp
+  - text: She died in March.
+    scene: empty rocking chair beside a cold fireplace, dust in a shaft of grey morning light
+  - text: Last week, I moved into her house.
+    scene: cardboard moving boxes in a dim old living room, floral wallpaper peeling, one lamp on
+  - text: Her rule was still taped inside the front door, in her handwriting.
+    scene: yellowed handwritten paper note taped to the inside of an old wooden door, lamp light, shallow depth of field
+  - text: Last night, at 3 a.m., I heard one knock.
+    scene: man lying awake in bed in a dark old bedroom, eyes open, staring at the ceiling, faint blue moonlight
+    sfx: knock
+    pause: 0.6
+  - text: Then two.
+    scene: dark narrow farmhouse hallway leading to the front door, a sliver of moonlight across the floorboards
     pause: 0.8
+  - text: I held my breath, and waited for the third.
+    scene: man's face in darkness half lit by a phone screen, holding his breath, sweat on his temple
+    sfx: heartbeat
+  - text: It never came.
+    scene: front door from a distance at the end of a pitch black hallway, completely still
+    pause: 1.0
+  - text: Instead, something dragged slowly along the hallway floor.
+    scene: low angle shot along old wooden floorboards in a dark hallway, long drag marks in the dust
+  - text: It stopped outside my bedroom.
+    scene: bedroom door slightly ajar, darkness beyond, warm lamp light spilling into the black gap
   - text: Then, from inside my closet, I heard my grandmother's voice.
-    visual: closet door dark
+    scene: old wooden wardrobe door open a crack in a dark bedroom, total blackness inside
     impact: true
   - text: “Good. You remembered.”
-    visual: shadow on wall
-  - text: “Now… *let me out.*”
-    visual: old woman portrait dark
+    scene: pale elderly woman's eye visible through the crack of a wardrobe door, in deep shadow
+  - text: My hand found the light switch. Nothing happened.
+    scene: trembling hand pressing an old round light switch on a dark bedroom wall
+  - text: The closet door creaked open on its own.
+    scene: wardrobe door swinging open into darkness, dusty old coats hanging, faint shape behind them
+  - text: Her coats were still hanging there. All of them were wet.
+    scene: close-up of old wool coats hanging in a wardrobe, dripping with dark water, candle light
+  - text: “Every rule has a reason,” she whispered.
+    scene: silhouette of a hunched old woman standing in the back of a wardrobe, face hidden in shadow
+  - text: “Mine was to keep it *out*.”
+    scene: the old farmhouse front door seen from outside at night, fog, the door slowly opening by itself
+    pause: 0.6
+  - text: Then the knocking started again. From inside the closet.
+    scene: extreme close-up of the inside of a wardrobe door, knuckle marks pressed into the wood
     impact: true
+    sfx: knock
 
 youtube:
-  title: Never Answer the Third Knock 🚪 #shorts #horror
+  title: Never Answer the Third Knock | Delightful Fright
   description: |
-    My grandmother had one rule… and I finally understand why.
+    My grandmother had one rule. Last night I finally learned why.
 
-    New short horror stories every week. Subscribe if you dare. 🕯️
+    A little dread before bed? New short horror stories every week. 🕯️
 
-    #horrorstories #scarystories #creepy #horror #shorts
+    #horror #scarystories #shorts #horrorshorts #creepy
   tags: [horror, scary stories, creepy, horror shorts, short horror story, scary, delightful fright]

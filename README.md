@@ -9,11 +9,12 @@ captions, sound design) plus ready-to-paste upload text. Costs $0.
 |---|---|---|
 | CEO / Head Writer | **You**: pick the stories, approve every upload | – |
 | Chief of Staff | Claude: drafts scripts with you, maintains this code | your existing plan |
-| Narrator | [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) TTS (open-source, runs locally) | free |
-| Creative Director | [Pexels](https://www.pexels.com/api/) stock video, your own art in `assets/`, or generated scenes | free |
-| Sound Designer | `pipeline/audio.py`: drone, booms and echo generated in code, so there's no licensing risk | free |
-| Editor + Captions | FFmpeg: grade, push-ins, word-pop captions | free |
-| Render Farm | GitHub Actions (2,000 free minutes/month on private repos; ~3–5 min per Short) | free |
+| Narrator | [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) TTS, voices can be blended (`bm_george:0.7,am_onyx:0.3`), then EQ, compression and a small room | free |
+| Art Director | AI cinematic stills from each line's `scene` prompt ([Pollinations](https://pollinations.ai) FLUX, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
+| Camera | `pipeline/visuals.py`: smooth push-ins, pans and handheld drift, camera shake and a flash on impacts, warm low-key grade, film grain | free |
+| Composer + Sound Designer | `pipeline/audio.py`: a generated dark score (drone, pad, sparse piano) that ducks under the voice, risers into booms, knocks, heartbeats, bells; or your own track | free |
+| Editor + Captions | FFmpeg + [faster-whisper](https://github.com/SYSTRAN/faster-whisper): captions timed to each spoken word with the current word lit, title card on the hook, mastered to YouTube's -14 LUFS | free |
+| Render Farm | GitHub Actions (2,000 free minutes/month on private repos; about 8–12 min per Short) | free |
 
 ## Make a Short
 
@@ -25,18 +26,24 @@ captions, sound design) plus ready-to-paste upload text. Costs $0.
 You can also re-render any story from **Actions → Render Shorts → Run workflow**.
 
 ### Writing tips that matter for Shorts
-- **Hook in the first line.** The first 2 seconds decide whether people swipe away.
-- **Aim for 35–55 seconds.** The render warns you if you go over 60.
-- **One idea per line.** Each line gets its own shot.
-- **End on a twist that loops.** Make the last line make people rewatch the first.
-- Use `*asterisks*` for red emphasis words, `impact: true` for a boom, and `pause: 0.8` for dramatic silence.
+- **Hook in the first line.** Say the title's promise straight away: the first 2 seconds decide the swipe.
+- **Aim for 60–75 seconds** (about 160–190 words, 18–24 lines). Short, plain sentences in first person.
+- **One image per line.** Write each `scene` like a film still: subject, place, light ("lit by one oil lamp").
+- **Escalate, then twist, then loop.** The last line should send people back to the first.
+- Use `*asterisks*` for red words, `impact: true` for a riser + boom + flash, `sfx: knock` for sound
+  effects, and `pause: 0.8` for silence. See the top of the sample story for every option.
 
 ## One-time setup
 
-1. **Free Pexels key** (strongly recommended, for real footage): sign up at https://www.pexels.com/api/, then add it to the
-   repo under **Settings → Secrets and variables → Actions → New repository secret**, named `PEXELS_API_KEY`.
-   Without it, you get generated foggy-forest backgrounds.
-2. That's it. Actions installs everything else.
+Nothing is required: AI stills come free from Pollinations. Optional repo secrets
+(**Settings → Secrets and variables → Actions → New repository secret**):
+
+- `HF_TOKEN`: a free [Hugging Face token](https://huggingface.co/settings/tokens); stills then come from FLUX.1-schnell, which is faster and more reliable.
+- `POLLINATIONS_TOKEN`: a free [Pollinations token](https://auth.pollinations.ai) for higher rate limits.
+- `PEXELS_API_KEY`: a free [Pexels key](https://www.pexels.com/api/), used for lines that have a `visual` search and no `scene`.
+
+Pull requests that touch a story or the pipeline render a preview Short automatically
+(**Checks → Render Shorts → Summary → Artifacts**).
 
 ### Run on your own computer (optional)
 ```bash

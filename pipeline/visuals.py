@@ -1,11 +1,20 @@
 """Background visuals for each line, in priority order:
 
 1. A file you dropped in assets/ (image or video): your own art or public-domain paintings.
-2. A free stock clip from Pexels (needs a free PEXELS_API_KEY).
-3. A generated foggy night scene, so a render never fails.
+2. An AI-generated cinematic still from the line's `scene` prompt (free, no key needed:
+   Pollinations FLUX; or Hugging Face FLUX.1-schnell when HF_TOKEN is set).
+3. A free stock clip from Pexels for the line's `visual` search (needs PEXELS_API_KEY).
+4. A generated foggy night scene, so a render never fails.
+
+Stills get smooth, sub-pixel camera moves (push-ins, pans, handheld drift)
+rendered frame by frame, then the channel's colour grade, grain and vignette.
 """
+import hashlib
+import io
 import os
 import subprocess
+import time
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
@@ -17,12 +26,24 @@ W, H, FPS = 1080, 1920, 30
 VIDEO_EXT = {".mp4", ".mov", ".webm", ".mkv"}
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 
-# Desaturated, cold, grainy, vignetted: the look of the channel.
-GRADE = (
-    "eq=saturation=0.35:contrast=1.15:brightness=-0.05,"
-    "colorbalance=bs=0.08:bm=0.04:rs=-0.05,"
-    "noise=alls=10:allf=t,vignette=PI/4.5"
+# Low-key and warm, like a room lit by one lamp (the channel's look); or cold, or sickly.
+GRADES = {
+    "amber": (
+        "eq=contrast=1.18:brightness=-0.05:saturation=0.82:gamma=0.9,"
+        "colorbalance=rs=0.07:gs=0.01:bs=-0.08:rm=0.05:bm=-0.05:rh=0.03:bh=-0.06"
+    ),
+    "cold": "eq=contrast=1.15:brightness=-0.05:saturation=0.35,colorbalance=bs=0.08:bm=0.04:rs=-0.05",
+    "green": "eq=contrast=1.2:brightness=-0.06:saturation=0.6,colorbalance=gs=0.06:gm=0.05:rs=-0.04:bh=-0.04",
+}
+FINISH = "noise=alls=8:allf=t+u,vignette=PI/4.2"
+
+DEFAULT_STYLE = (
+    "cinematic horror film still, photorealistic, shot on 35mm film, low-key lighting, "
+    "deep black shadows, single warm practical light source, muted desaturated colours, "
+    "subtle film grain, eerie and quiet, vertical 9:16 composition, no text, no watermark"
 )
+
+MOVES = ["push_in", "drift_left", "pull_out", "rise", "push_in", "drift_right", "sink"]
 
 
 def find_local(spec: str) -> Path | None:
@@ -30,6 +51,71 @@ def find_local(spec: str) -> Path | None:
         p = base / spec
         if p.is_file() and p.suffix.lower() in VIDEO_EXT | IMAGE_EXT:
             return p
+    return None
+
+
+def _valid_image(data: bytes) -> bool:
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.verify()
+        return min(im.size) >= 512
+    except Exception:
+        return False
+
+
+def _huggingface(prompt: str, seed: int) -> bytes | None:
+    token = os.environ.get("HF_TOKEN")
+    if not token:
+        return None
+    r = requests.post(
+        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"inputs": prompt, "parameters": {"width": 768, "height": 1344, "seed": seed}},
+        timeout=180,
+    )
+    r.raise_for_status()
+    return r.content
+
+
+def _pollinations(prompt: str, seed: int) -> bytes | None:
+    url = "https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt)
+    params = {"width": 1080, "height": 1920, "seed": seed, "model": "flux", "nologo": "true"}
+    headers = {}
+    if token := os.environ.get("POLLINATIONS_TOKEN"):
+        headers["Authorization"] = f"Bearer {token}"
+    r = requests.get(url, params=params, headers=headers, timeout=180)
+    r.raise_for_status()
+    return r.content
+
+
+_unreachable: set = set()
+
+
+def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | None:
+    full = f"{prompt}, {style}"
+    dest = cache / f"ai_{hashlib.sha1(f'{full}|{seed}'.encode()).hexdigest()[:16]}.jpg"
+    if dest.exists():
+        return dest
+    for source in (_huggingface, _pollinations):
+        for attempt in range(4):
+            if source in _unreachable:
+                break
+            try:
+                data = source(full, seed)
+            except requests.ConnectionError as e:
+                print(f"  ! can't reach {source.__name__.strip('_')}, skipping it: {type(e).__name__}")
+                _unreachable.add(source)
+                break
+            except requests.RequestException as e:
+                print(f"  ! {source.__name__.strip('_')} attempt {attempt + 1} failed: {e}")
+                time.sleep(8 * (attempt + 1))
+                continue
+            if data is None:
+                break
+            if _valid_image(data):
+                Image.open(io.BytesIO(data)).convert("RGB").save(dest, quality=95)
+                return dest
+            time.sleep(4)
     return None
 
 
@@ -108,36 +194,79 @@ def generate_scene(seed: int, dest: Path) -> Path:
     return dest
 
 
-def resolve(spec: str, seed: int, cache: Path, used: set[int]) -> tuple[Path, str]:
+def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int]) -> tuple[Path, str]:
     """Return (path, source label) for one line's visual."""
+    spec, scene = line.get("visual", ""), line.get("scene", "")
     if spec and (local := find_local(spec)):
         return local, "local"
+    if scene and (still := fetch_ai_image(scene, style, seed, cache)):
+        return still, "ai"
     if spec and (clip := fetch_pexels(spec, cache, used)):
+        return clip, "pexels"
+    if scene and (clip := fetch_pexels(scene, cache, used)):
         return clip, "pexels"
     return generate_scene(seed, cache / f"scene_{seed}.jpg"), "generated"
 
 
-def render_segment(src: Path, duration: float, dest: Path, zoom_in: bool = True):
-    """Render one line's background as a 1080x1920 clip with a slow push-in."""
+def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int):
+    """Yield raw RGB frames of a slow camera move over a still image."""
     frames = max(1, round(duration * FPS))
-    fade = f"fade=t=in:st=0:d=0.25,fade=t=out:st={max(0.0, duration - 0.25):.3f}:d=0.25"
+    img = Image.open(src).convert("RGB")
+    # Cover the frame with 16% headroom so the camera can move without showing edges.
+    scale = max(W / img.width, H / img.height) * 1.16
+    img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+    iw, ih = img.size
+    rng = np.random.default_rng(seed)
+    phase = rng.uniform(0, 100, 4)
+    for f in range(frames):
+        p = f / max(1, frames - 1)
+        ease = p * p * (3 - 2 * p)  # smoothstep
+        zoom = {"push_in": 1 + 0.10 * ease, "pull_out": 1.10 - 0.10 * ease}.get(move, 1.05)
+        cw = min(iw, ih * W / H) / 1.16 / zoom  # visible width in source pixels
+        ch = cw * H / W
+        cx, cy = iw / 2, ih / 2
+        slack_x, slack_y = (iw - cw) / 2, (ih - ch) / 2
+        if move == "drift_left":
+            cx += slack_x * 0.8 * (0.5 - ease)
+        elif move == "drift_right":
+            cx -= slack_x * 0.8 * (0.5 - ease)
+        elif move == "rise":
+            cy += slack_y * 0.8 * (0.5 - ease)
+        elif move == "sink":
+            cy -= slack_y * 0.8 * (0.5 - ease)
+        # Handheld drift: two slow sines per axis, a few pixels; a hard shake on impacts.
+        t = f / FPS
+        amp = 3.0 + (14.0 * np.exp(-t * 5) if shake else 0.0)
+        hz = 1.0 if not shake else 1.0 + 6 * np.exp(-t * 4)
+        cx += amp * (np.sin(0.7 * hz * t + phase[0]) + 0.5 * np.sin(1.9 * hz * t + phase[1]))
+        cy += amp * (np.sin(0.6 * hz * t + phase[2]) + 0.5 * np.sin(1.7 * hz * t + phase[3]))
+        cx = min(max(cx, cw / 2), iw - cw / 2)
+        cy = min(max(cy, ch / 2), ih - ch / 2)
+        box = (cx - cw / 2, cy - ch / 2, cx + cw / 2, cy + ch / 2)
+        yield img.transform((W, H), Image.EXTENT, box, Image.BICUBIC).tobytes()
+
+
+def render_segment(src: Path, duration: float, dest: Path, grade: str = "amber", move: str = "push_in",
+                   impact: bool = False, seed: int = 0):
+    """Render one line's background as a 1080x1920 clip."""
+    look = f"{GRADES.get(grade, GRADES['amber'])},{FINISH}"
+    if impact:  # a white flash that decays as the boom hits
+        look += ",eq=brightness='if(lt(t,0.18),0.55*(1-t/0.18),0)':eval=frame"
+    out = ["-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+           "-r", str(FPS), "-t", f"{duration:.3f}", str(dest)]
     if src.suffix.lower() in VIDEO_EXT:
-        inputs = ["-stream_loop", "-1", "-i", str(src)]
         vf = (
             f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
-            f"setpts=1.3*PTS,fps={FPS},{GRADE},{fade}"  # slowed down for an eerie feel
+            f"setpts=1.3*PTS,fps={FPS},{look}"  # slowed down for an eerie feel
         )
-    else:
-        z = f"1+0.12*on/{frames}" if zoom_in else f"1.12-0.12*on/{frames}"
-        inputs = ["-i", str(src)]
-        vf = (
-            f"scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
-            f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},"
-            f"{GRADE},{fade}"
-        )
-    cmd = [
-        "ffmpeg", "-y", "-loglevel", "error", *inputs, "-t", f"{duration:.3f}",
-        "-vf", vf + ",format=yuv420p", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-        "-r", str(FPS), str(dest),
-    ]
-    subprocess.run(cmd, check=True)
+        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-stream_loop", "-1", "-i", str(src), "-vf", vf, *out]
+        subprocess.run(cmd, check=True)
+        return
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
+           "-r", str(FPS), "-i", "-", "-vf", look, *out]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    for frame in _still_frames(src, duration, move, impact, seed):
+        proc.stdin.write(frame)
+    proc.stdin.close()
+    if proc.wait():
+        raise subprocess.CalledProcessError(proc.returncode, cmd)

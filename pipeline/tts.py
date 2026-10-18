@@ -22,8 +22,19 @@ class KokoroTTS:
         from kokoro_onnx import Kokoro
 
         self.engine = Kokoro(str(KOKORO_MODEL), str(KOKORO_VOICES))
-        self.voice = voice
+        self.voice = self._blend(voice) if "," in voice or ":" in voice else voice
         self.speed = speed
+
+    def _blend(self, spec: str):
+        """'am_onyx:0.6,bm_george:0.4' mixes voices into one narrator."""
+        names, weights = [], []
+        for part in spec.split(","):
+            name, _, weight = part.strip().partition(":")
+            names.append(name)
+            weights.append(float(weight or 1))
+        weights = np.array(weights) / sum(weights)
+        styles = [self.engine.get_voice_style(n) for n in names]
+        return sum(w * s for w, s in zip(weights, styles))
 
     def synth(self, text: str):
         samples, sr = self.engine.create(text, voice=self.voice, speed=self.speed, lang="en-us")

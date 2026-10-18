@@ -1,10 +1,13 @@
 name: Render Shorts
 
-# Renders automatically when you add or edit a story, or on demand from the Actions tab.
+# Renders automatically when you add or edit a story, on demand from the Actions tab,
+# and as a preview on pull requests that change the pipeline or a story.
 on:
   push:
     branches: [main]
     paths: ["stories/**.yaml"]
+  pull_request:
+    paths: ["stories/**.yaml", "pipeline/**", "assets/**", "requirements.txt", ".github/workflows/render.yml"]
   workflow_dispatch:
     inputs:
       story:
@@ -14,20 +17,24 @@ on:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Pick stories to render
         id: pick
         env:
           EVENT: ${{ github.event_name }}
           INPUT_STORY: ${{ inputs.story }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           if [ "$EVENT" = "workflow_dispatch" ]; then
             files="$INPUT_STORY"
+          elif [ "$EVENT" = "pull_request" ]; then
+            files=$(git diff --name-only --diff-filter=AM "origin/$BASE_REF"...HEAD -- 'stories/*.yaml' | tr '\n' ' ')
+            files="${files:-stories/never-answer-the-third-knock.yaml}"
           else
             files=$(git diff --name-only --diff-filter=AM HEAD^ HEAD -- 'stories/*.yaml' | tr '\n' ' ')
           fi
@@ -44,11 +51,13 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Cache narrator model
+      - name: Cache narrator and word-timing models
         uses: actions/cache@v4
         with:
-          path: models
-          key: kokoro-v1.0
+          path: |
+            models
+            ~/.cache/huggingface
+          key: kokoro-v1.0-whisper-tiny.en
 
       - run: python -m pipeline.download_models
 
@@ -56,6 +65,8 @@ jobs:
         if: steps.pick.outputs.files != ''
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
           FILES: ${{ steps.pick.outputs.files }}
         run: python -m pipeline.render --engine kokoro $FILES
 
