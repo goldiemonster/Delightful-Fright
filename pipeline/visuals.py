@@ -29,6 +29,8 @@ import numpy as np
 import requests
 from PIL import Image, ImageDraw, ImageFilter
 
+from . import hands
+
 ROOT = Path(__file__).resolve().parent.parent
 W, H, FPS = 1080, 1920, 30
 VIDEO_EXT = {".mp4", ".mov", ".webm", ".mkv"}
@@ -160,18 +162,24 @@ def fetch_plate(name: str, plates: dict, style: str, cache: Path) -> Path | None
     key = f"{full}|{seed}|{parent.name if parent else ''}|{strength if parent else ''}"
     dest = cache / f"plate_{name}_{hashlib.sha1(key.encode()).hexdigest()[:12]}.jpg"
     if dest.exists():
+        hands.check(dest)
         return dest
     print(f"  painting plate {name}" + (f" (from {spec['from']})" if parent else ""))
-    for attempt in range(3):
+    painted = None
+    for attempt in range(4):
         try:
             data = _aihorde(full, seed + attempt, PLATE_SIZE, parent, strength)
         except requests.RequestException as e:
             print(f"  ! plate {name} attempt {attempt + 1} failed: {e}")
             continue
         if data and _valid_image(data):
+            dest.with_suffix(".hands.json").unlink(missing_ok=True)
             Image.open(io.BytesIO(data)).convert("RGB").save(dest, quality=95)
-            return dest
-    return None
+            painted = dest
+            if hands.check(dest) is not False:
+                break
+            print(f"  repainting plate {name} for its hands")
+    return painted
 
 
 _unreachable: set = set()
@@ -190,14 +198,22 @@ def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | No
     full = f"{prompt}. {style}"
     dest = cache / f"ai_{hashlib.sha1(f'{full}|{seed}'.encode()).hexdigest()[:16]}.jpg"
     if dest.exists():
+        hands.check(dest)
         return dest
     # FLUX sometimes paints these prompts in plain greys. Re-roll those up to twice, nudged
     # towards colour, and keep the warmest, so every shot matches the channel's amber look.
+    # Bad hands get repainted too (see hands.py): a shot must pass that before warmth counts.
     best, ask, try_seed = None, full, seed
     for tries_left in (2, 1, 0):
         img = _generate(ask, try_seed)
         if img is None:
             break
+        dest.with_suffix(".hands.json").unlink(missing_ok=True)
+        img.save(dest, quality=95)
+        if hands.check(dest) is False:
+            print("  repainting the shot for its hands")
+            try_seed += 1000
+            continue
         if best is None or _warmth(img) > _warmth(best):
             best = img
         if _warmth(best) >= MIN_WARMTH or not tries_left:
@@ -205,8 +221,10 @@ def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | No
         print(f"  ! shot came out grey (warmth {_warmth(img):.2f}), repainting it")
         ask, try_seed = f"{full}, rich warm colour", try_seed + 1000
     if best is None:
-        return None
+        return dest if dest.exists() else None  # every try had bad hands: QA fails the shot
+    dest.with_suffix(".hands.json").unlink(missing_ok=True)
     best.save(dest, quality=95)
+    hands.check(dest)
     return dest
 
 

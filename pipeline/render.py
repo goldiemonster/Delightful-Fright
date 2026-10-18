@@ -14,7 +14,7 @@ import numpy as np
 import soundfile as sf
 import yaml
 
-from . import align, audio, captions, qa, tts, visuals
+from . import align, audio, captions, publish, qa, tts, visuals
 
 ROOT = Path(__file__).resolve().parent.parent
 PAUSE_AFTER_HOOK = 0.7
@@ -41,7 +41,8 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Path:
+def render(story_path: Path, out_root: Path, engine: str, keep_work: bool, post: bool = False,
+           post_anyway: bool = False) -> Path:
     story = yaml.safe_load(story_path.read_text(encoding="utf-8"))
     slug = story.get("slug") or slugify(story["title"])
     out_dir = out_root / slug
@@ -164,6 +165,12 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     if not keep_work:
         shutil.rmtree(work)
     print(f"Done → {final}")
+
+    # 7. Post to the channel, only when every QA check passed (or --post-anyway after a human review).
+    if post and (passed or post_anyway):
+        publish.publish(final, story)
+    elif post:
+        print("  ! not posted: QA failed. Fix it, or review the video and re-run with --post-anyway")
     return final
 
 
@@ -173,9 +180,11 @@ def main():
     ap.add_argument("--out", type=Path, default=ROOT / "out")
     ap.add_argument("--engine", choices=["auto", "kokoro", "cartesia", "espeak"], default="auto")
     ap.add_argument("--keep-work", action="store_true", help="keep intermediate files for debugging")
+    ap.add_argument("--post", action="store_true", help="post to YouTube when QA passes (needs YOUTUBE_* secrets)")
+    ap.add_argument("--post-anyway", action="store_true", help="with --post: post even if a QA check failed")
     args = ap.parse_args()
     for story in args.stories:
-        render(story, args.out, args.engine, args.keep_work)
+        render(story, args.out, args.engine, args.keep_work, args.post, args.post_anyway)
 
 
 if __name__ == "__main__":

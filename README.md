@@ -37,7 +37,10 @@ You can also re-render any story from **Actions → Render Shorts → Run workfl
   point each line at one with `plate:`, reframing it with `frame: [x, y, zoom]`. A plate with
   `from: hallway` and `strength: 0.5` is an edit of that master (a hand at the door, a shadow on
   the wall), so the room and the light never change between shots. Keep faces out of frame:
-  hands, sleeves and silhouettes stay consistent where AI-painted faces drift.
+  sleeves, objects and silhouettes stay consistent where AI-painted faces drift.
+- **Hands are checked.** AI painters still draw four or six fingers, so every new painting is
+  shown to Claude, which counts the fingers on each visible hand; a bad hand is repainted with a
+  new seed, and QA fails if one survives (needs the `ANTHROPIC_API_KEY` secret).
 - Use `*asterisks*` for amber words, `impact: true` for a silence, low swell and faltering light, `sfx: knock` for sound
   effects, and `pause: 0.8` for silence. See the top of the sample story for every option.
 
@@ -57,7 +60,20 @@ Nothing is required: AI stills come free from Pollinations. Optional repo secret
 - `POLLINATIONS_TOKEN`: a free [Pollinations token](https://auth.pollinations.ai) for higher rate limits.
 - `AIHORDE_API_KEY`: optional free [AI Horde key](https://aihorde.net/register). When Pollinations is rate-limited, stills come from AI Horde's volunteer GPUs; anonymous works but queues behind registered users.
 - `CARTESIA_API_KEY`: your [Cartesia](https://play.cartesia.ai) key, for stories that set `cartesia_voice`.
+- `ANTHROPIC_API_KEY`: an [Anthropic API key](https://console.anthropic.com), for the hand check (about a cent per painting). Without it, QA asks you to look at the hands yourself.
 - `PEXELS_API_KEY`: a free [Pexels key](https://www.pexels.com/api/), used for lines that have a `visual` search and no `scene`.
+
+### Posting to YouTube (the last step)
+Run **Actions → Render Shorts → Run workflow**, pick the story and tick **post**. When every QA
+check passes, the Short goes to the channel with the title, description and tags from the story's
+`youtube:` block (`privacy: public` by default; set `privacy: private` to review it there first),
+marked as altered or synthetic content. Story pushes and pull-request previews never post.
+It needs three secrets from a Google Cloud OAuth client with the YouTube Data API v3 enabled,
+signed in as the Delightful Fright channel: `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` and
+`YOUTUBE_REFRESH_TOKEN` (get the refresh token once with the
+[OAuth Playground](https://developers.google.com/oauthplayground), scope
+`https://www.googleapis.com/auth/youtube.upload`, using your own client). Locally:
+`python -m pipeline.render --post stories/<story>.yaml`.
 
 Pull requests that touch a story or the pipeline render a preview Short automatically
 (**Checks → Render Shorts → Summary → Artifacts**).
@@ -82,4 +98,4 @@ python -m pipeline.render stories/never-answer-the-third-knock.yaml
 ## Roadmap
 - [x] Phase 1: story → finished Short
 - [ ] Phase 2: content calendar in Google Sheets and a backlog of public-domain story ideas
-- [ ] Phase 3: auto-upload to YouTube as **private/scheduled** for one-click approval
+- [x] Phase 3: post to YouTube as the last step, gated on QA

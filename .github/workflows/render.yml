@@ -13,6 +13,10 @@ on:
       story:
         description: "Story file to render (e.g. stories/never-answer-the-third-knock.yaml)"
         required: true
+      post:
+        description: "Last step: post to YouTube if every QA check passes"
+        type: boolean
+        default: false
 
 jobs:
   render:
@@ -68,8 +72,15 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
           CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AIHORDE_API_KEY: ${{ secrets.AIHORDE_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FILES: ${{ steps.pick.outputs.files }}
-        run: python -m pipeline.render --engine kokoro $FILES
+          # Only a manual run with "post" ticked posts; story pushes and PR previews just render.
+          POST: ${{ github.event_name == 'workflow_dispatch' && inputs.post && '--post' || '' }}
+        run: python -m pipeline.render --engine kokoro $POST $FILES
 
       - uses: actions/upload-artifact@v4
         if: steps.pick.outputs.files != ''

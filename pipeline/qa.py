@@ -11,6 +11,8 @@ from pathlib import Path
 
 import numpy as np
 
+from . import hands
+
 SYNC_TOLERANCE = 0.25  # seconds a caption may lead or trail the voice it shows
 LINE_MIN_COVERAGE = 0.85  # share of a line's words the recogniser must hear
 VOICE_OVER_BED_DB = 8.0  # voice must sit this far above music + effects while speaking
@@ -127,6 +129,15 @@ def run(video: Path, lines: list[str], coverages: list[float | None], timeline, 
         check("Story shots", not missing,
               f"lines {', '.join(map(str, missing))} fell back to a placeholder (no image source reachable)"
               if missing else f"all {len(sources)} shots from the shot list")
+
+    # Hands: every painting was shown to a vision model that counts fingers (see hands.py).
+    if hands.REPORT:
+        bad = [f"{n}: {v.get('problem')}" for n, v in hands.REPORT.items() if v.get("ok") is False]
+        unchecked = [n for n, v in hands.REPORT.items() if v.get("ok") is None]
+        check("Hands anatomically correct", False if bad else None if unchecked else True,
+              "; ".join(bad) or (f"{len(unchecked)} of {len(hands.REPORT)} paintings not checked "
+                                 "(needs ANTHROPIC_API_KEY): look at the hands yourself" if unchecked else
+                                 f"all {len(hands.REPORT)} paintings checked"))
 
     black = _black_frames(video)
     check("No black frames", not black, ", ".join(f"{a:.1f}-{b:.1f}s" for a, b in black) or "none")
