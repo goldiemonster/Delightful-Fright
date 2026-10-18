@@ -37,7 +37,8 @@ def _black_frames(video: Path) -> list[tuple[float, float]]:
     return [(float(a), float(b)) for a, b in re.findall(r"black_start:([\d.]+) black_end:([\d.]+)", err)]
 
 
-def run(video: Path, lines: list[str], coverages: list[float | None], timeline, stems: dict, sr: int) -> bool:
+def run(video: Path, lines: list[str], coverages: list[float | None], timeline, stems: dict, sr: int,
+        sources: list[str] = ()) -> bool:
     """Write qa.txt beside the video; return True when nothing FAILED."""
     checks = []
 
@@ -75,6 +76,13 @@ def run(video: Path, lines: list[str], coverages: list[float | None], timeline, 
     last = coverages[-1]
     check("Ending audible", (tail_db > -40) and (last is None or last >= LINE_MIN_COVERAGE),
           f"last 10 s at {tail_db:.0f} dBFS RMS" + ("" if last is None else f", final line heard {last:.0%}"))
+
+    # Every shot must be a story shot, never the generic fog placeholder.
+    if sources:
+        missing = [i + 1 for i, s in enumerate(sources) if s == "placeholder"]
+        check("Story shots", not missing,
+              f"lines {', '.join(map(str, missing))} fell back to a placeholder (no image source reachable)"
+              if missing else f"all {len(sources)} shots from the shot list")
 
     black = _black_frames(video)
     check("No black frames", not black, ", ".join(f"{a:.1f}-{b:.1f}s" for a, b in black) or "none")

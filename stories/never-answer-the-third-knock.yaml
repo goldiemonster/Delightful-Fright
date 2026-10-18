@@ -27,12 +27,13 @@ music: auto        # auto = generated score; or assets/music/your-track.mp3; or 
 ambience: room     # room | rain | wind | none
 # style: overrides the art direction added to every shot (default: charcoal/graphite ashcan noir)
 
-# Continuity anchors, added to every shot so faces, rooms and props stay consistent.
+# Continuity anchors keep faces, rooms and props the same from shot to shot.
+# A named anchor is described in every shot whose scene mentions it (so write
+# "the narrator ...", "the grandmother's hand ..."); `world` goes into every shot.
 anchors:
   narrator: man in his thirties, short dark hair, stubble, grey wool sweater
   grandmother: thin woman in her eighties, white hair in a bun, black cardigan
-  house: old farmhouse, narrow hallway, heavy oak front door at one end, bedroom with a tall wardrobe
-  light: single oil lamp or moonlight, deep shadows
+  world: old isolated farmhouse at night, bare wooden floors, lit by a single oil lamp or moonlight, deep shadows
 
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.

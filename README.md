@@ -30,14 +30,17 @@ You can also re-render any story from **Actions → Render Shorts → Run workfl
 - **Build the ending first.** Then give the narrator a goal, a concrete anomaly, two escalating
   discoveries, an active choice, and a revelation the story has earned.
 - **Hook in the first line**, and **aim for 75–90 seconds** (about 190–230 words, 18–24 lines).
-- **One shot per line.** Put the cast, rooms and light in `anchors` once; give each line a `scene`
-  and, when it matters, a `camera`, a single `action`, and the `evidence` that must be visible.
+- **One shot per line.** Describe each character once in `anchors` and the place and light in
+  `anchors.world`; give each line a `scene` that names who is in it ("the narrator ..."), and,
+  when it matters, a `camera`, a single `action`, and the `evidence` that must be visible.
 - Use `*asterisks*` for red words, `impact: true` for a riser + boom + flash, `sfx: knock` for sound
   effects, and `pause: 0.8` for silence. See the top of the sample story for every option.
 
 ### Before you publish
 Each render writes `qa.txt` (PASS / FAIL / UNVERIFIED per check) and `stems/` next to the video.
 The checks measure; they don't listen, so play the video once at normal speed before uploading.
+If no image source was reachable, shots fall back to a plain fog placeholder and the
+"Story shots" check FAILS: re-render where the image service is reachable (GitHub Actions is).
 
 ## One-time setup
 

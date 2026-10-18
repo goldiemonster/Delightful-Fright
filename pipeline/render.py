@@ -99,13 +99,13 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     # 3. Visuals: one shot per line.
     style = story.get("style", visuals.DEFAULT_STYLE)
     grade = story.get("grade", "noir")
-    anchors = story.get("anchors", "")
-    if isinstance(anchors, dict):
-        anchors = "; ".join(f"{k}: {v}" for k, v in anchors.items())
+    anchors = story.get("anchors") or ""
     used: set[int] = set()
+    sources = []
     concat = []
     for i, (line, (start, _, end)) in enumerate(zip(lines, timeline)):
         src, label = visuals.resolve(line, style, seed_base + i, cache, used, anchors)
+        sources.append(label)
         seg = work / f"seg_{i:02d}.mp4"
         impact = i == 0 or bool(line.get("impact"))
         move = line.get("move", visuals.MOVES[i % len(visuals.MOVES)])
@@ -156,7 +156,7 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     ]
     (out_dir / "upload.txt").write_text("\n".join(meta), encoding="utf-8")
 
-    passed = qa.run(final, [line["text"] for line in lines], coverages, timeline, stems, sr)
+    passed = qa.run(final, [line["text"] for line in lines], coverages, timeline, stems, sr, sources)
     if not passed:
         print("  ! QA found problems: see qa.txt before publishing")
 

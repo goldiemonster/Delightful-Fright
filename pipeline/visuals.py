@@ -4,7 +4,8 @@
 2. An AI-generated still from the line's shot prompt (free, no key needed:
    Pollinations FLUX; or Hugging Face FLUX.1-schnell when HF_TOKEN is set).
 3. A free stock clip from Pexels for the line's `visual` search (needs PEXELS_API_KEY).
-4. A generated foggy night scene, so a render never fails.
+4. A generated foggy night scene, so a render never crashes. It shows nothing
+   from the story, so QA fails any video that uses it.
 
 Stills get smooth, sub-pixel camera moves (push-ins, pans, handheld drift)
 rendered frame by frame, then the channel's colour grade, grain and vignette.
@@ -94,10 +95,11 @@ def _pollinations(prompt: str, seed: int) -> bytes | None:
 
 
 _unreachable: set = set()
+PLACEHOLDER = "placeholder"  # the generated fog scene: not a story shot
 
 
 def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | None:
-    full = f"{prompt}, {style}"
+    full = f"{style}. {prompt}"
     dest = cache / f"ai_{hashlib.sha1(f'{full}|{seed}'.encode()).hexdigest()[:16]}.jpg"
     if dest.exists():
         return dest
@@ -199,21 +201,37 @@ def generate_scene(seed: int, dest: Path) -> Path:
     return dest
 
 
-def shot_prompt(line: dict, anchors: str) -> str:
-    """Build a shot prompt the way the production bible does: anchors, camera, action, evidence."""
-    parts = [line.get("scene", "")]
-    if line.get("camera"):
-        parts.append(f"camera: {line['camera']}")
+def shot_prompt(line: dict, anchors: dict | str) -> str:
+    """Build a shot prompt the way the production bible does: anchors, camera, action, evidence.
+
+    Anchors keep cast and places consistent. A named anchor (narrator, grandmother...)
+    is described inline only in shots that mention it, so the model draws who the
+    shot is about and nobody else; the `world` anchor goes into every shot.
+    """
+    scene = line.get("scene", "")
+    if not scene:
+        return ""
+    parts = [scene]
     if line.get("action"):
         parts.append(f"single physical action: {line['action']}")
     if line.get("evidence"):
         parts.append(f"clearly visible: {line['evidence']}")
-    if anchors and any(parts):
-        parts.append(f"continuity: {anchors}")
-    return ", ".join(p for p in parts if p)
+    if line.get("camera"):
+        parts.append(f"camera: {line['camera']}")
+    text = ", ".join(parts)
+    if isinstance(anchors, str):
+        return f"{text}, continuity: {anchors}" if anchors else text
+    for name, desc in anchors.items():
+        if name != "world" and name.lower() in text.lower():
+            i = text.lower().index(name.lower()) + len(name)
+            i += 2 if text[i:i + 2] == "'s" else 0
+            text = f"{text[:i]} ({desc}){text[i:]}"
+    if anchors.get("world"):
+        text += f", setting: {anchors['world']}"
+    return text
 
 
-def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anchors: str = "") -> tuple[Path, str]:
+def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anchors: dict | str = "") -> tuple[Path, str]:
     """Return (path, source label) for one line's visual."""
     spec, scene = line.get("visual", ""), shot_prompt(line, anchors)
     if spec and (local := find_local(spec)):
@@ -224,7 +242,8 @@ def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anch
         return clip, "pexels"
     if line.get("scene") and (clip := fetch_pexels(line["scene"], cache, used)):
         return clip, "pexels"
-    return generate_scene(seed, cache / f"scene_{seed}.jpg"), "generated"
+    # Last resort, so a render never crashes; QA fails the video if any shot ends up here.
+    return generate_scene(seed, cache / f"scene_{seed}.jpg"), PLACEHOLDER
 
 
 def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int):

@@ -57,6 +57,11 @@ def _place(out: np.ndarray, clip: np.ndarray, at: float, sr: int, gain: float = 
         out[i:j] += gain * clip[: j - i]
 
 
+def _fit(x: np.ndarray, n: int) -> np.ndarray:
+    """Pad or trim to exactly n samples (float rounding can leave a layer one sample off)."""
+    return np.pad(x, (0, max(0, n - x.size)))[:n]
+
+
 def _peak1(x: np.ndarray) -> np.ndarray:
     return x / (np.max(np.abs(x)) + 1e-9)
 
@@ -273,9 +278,9 @@ def mix(narration: np.ndarray, sr: int, work: Path, impacts: list[float], cuts: 
     """The final mix, plus its stems (voice, music, effects) at the same scale for review."""
     total = narration.size
     voice = process_voice(narration, sr, work)
-    voice = np.pad(voice, (0, max(0, total - voice.size)))[:total]
+    voice = _fit(voice, total)
 
-    bed = load_music(music, total / sr, sr) if music else score(total / sr, sr, seed, impacts)
+    bed = _fit(load_music(music, total / sr, sr) if music else score(total / sr, sr, seed, impacts), total)
     bed = bed * _duck(narration, sr, depth=0.6) * music_level
 
     fx = np.zeros(total, dtype=np.float32)
@@ -288,7 +293,7 @@ def mix(narration: np.ndarray, sr: int, work: Path, impacts: list[float], cuts: 
     for at, name in sfx:
         _place(fx, _peak1(SFX[name](sr)), at, sr, 0.14)
 
-    fx += ambience(room, total / sr, sr, seed) * _duck(narration, sr, depth=0.3) * 0.07
+    fx += _fit(ambience(room, total / sr, sr, seed), total) * _duck(narration, sr, depth=0.3) * 0.07
 
     stems = {"voice": voice, "music": bed, "effects": fx}
     out = voice + bed + fx
