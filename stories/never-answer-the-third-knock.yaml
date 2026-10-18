@@ -82,16 +82,6 @@ plates:
     strength: 0.7
     seed: 24
     prompt: farmhouse bedroom at night, the line of light under the closed bedroom door broken by the dark shadow of two feet standing outside, oil lamp, wardrobe, quilt
-  hall_frame:
-    from: hallway
-    strength: 0.72
-    seed: 25
-    prompt: a man's hand in a grey wool sweater sleeve gripping the edge of a wooden door frame in the left foreground, looking down the long dark farmhouse hallway toward the oak front door
-  bedroom_open:
-    from: bedroom
-    strength: 0.75
-    seed: 26
-    prompt: farmhouse bedroom at night, the tall wardrobe in the corner now hangs wide open onto total blackness, long pale thin fingers curling around the edge of the wardrobe door, oil lamp guttering
 
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.
@@ -122,7 +112,7 @@ lines:
     pause: 0.9
   - text: I held my breath, and waited for the third.
     plate: bedroom
-    frame: [0.45, 0.78, 1.8]
+    frame: [0.42, 0.66, 1.8]
     sfx: creak
   - text: It never came.
     plate: hallway
@@ -131,21 +121,22 @@ lines:
     pause: 1.0
   - text: Instead, something dragged itself along the hallway floor.
     plate: hall_drag
-    frame: [0.5, 0.7, 1.5]
+    frame: [0.5, 0.78, 1.5]
     move: sink
   - text: It stopped outside my bedroom. Then it went *past*.
     plate: bedroom_shadow
     frame: [0.75, 0.6, 1.7]
   - text: From inside my closet, I heard my grandmother's voice.
     plate: bedroom
-    frame: [0.5, 0.4, 1.5]
+    frame: [0.4, 0.4, 1.6]
     move: push_in
     impact: true
   - text: “Good. You remembered.”
     plate: wardrobe_eye
     move: push_in
   - text: “Now open the front door. Quickly. Before it finds the way in.”
-    plate: hall_frame
+    plate: bedroom
+    frame: [0.78, 0.42, 1.8]
   - text: I ran for the door. Whatever was outside had stopped knocking.
     plate: hallway
     frame: [0.45, 0.75, 1.6]
@@ -166,8 +157,8 @@ lines:
     move: push_in
     pause: 0.8
   - text: Behind me, from inside the closet, came the third knock.
-    plate: bedroom_open
-    frame: [0.5, 0.4, 1.3]
+    plate: bedroom
+    frame: [0.37, 0.36, 2.3]
     move: push_in
     impact: true
     sfx: knock
