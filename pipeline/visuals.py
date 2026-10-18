@@ -44,9 +44,9 @@ GRADES = {
 FINISH = "noise=alls=8:allf=t+u,vignette=PI/4.2"
 
 DEFAULT_STYLE = (
-    "mature charcoal and graphite ashcan noir illustration, realistic adult anatomy, "
-    "legible faces and clues, heavy cross-hatched shadows, muted amber and blue-grey palette, "
-    "vertical 9:16 single frame, no collage, no text, no watermark"
+    "Mature charcoal and graphite ashcan noir illustration, heavy cross-hatched shadows, "
+    "muted amber and blue-grey tones, rough paper grain, legible clues, single frame, "
+    "no collage, no text, no watermark"
 )
 
 MOVES = ["push_in", "drift_left", "pull_out", "rise", "push_in", "drift_right", "sink"]
@@ -99,7 +99,7 @@ PLACEHOLDER = "placeholder"  # the generated fog scene: not a story shot
 
 
 def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | None:
-    full = f"{style}. {prompt}"
+    full = f"{prompt}. {style}"
     dest = cache / f"ai_{hashlib.sha1(f'{full}|{seed}'.encode()).hexdigest()[:16]}.jpg"
     if dest.exists():
         return dest
@@ -202,32 +202,30 @@ def generate_scene(seed: int, dest: Path) -> Path:
 
 
 def shot_prompt(line: dict, anchors: dict | str) -> str:
-    """Build a shot prompt the way the production bible does: anchors, camera, action, evidence.
+    """Build a shot prompt the way the production bible does: camera, subject, action, evidence,
+    then continuity anchors.
 
-    Anchors keep cast and places consistent. A named anchor (narrator, grandmother...)
-    is described inline only in shots that mention it, so the model draws who the
-    shot is about and nobody else; the `world` anchor goes into every shot.
+    The framing and subject come first because image models weight the start of a prompt most.
+    A named anchor (narrator, grandmother...) is added only to shots that mention it, so the
+    model draws who the shot is about and nobody else; the `world` anchor goes into every shot.
     """
     scene = line.get("scene", "")
     if not scene:
         return ""
-    parts = [scene]
+    parts = [f"{line['camera']} shot: {scene}" if line.get("camera") else scene]
     if line.get("action"):
-        parts.append(f"single physical action: {line['action']}")
+        parts.append(line["action"])
     if line.get("evidence"):
-        parts.append(f"clearly visible: {line['evidence']}")
-    if line.get("camera"):
-        parts.append(f"camera: {line['camera']}")
+        parts.append(f"clearly showing {line['evidence']}")
     text = ", ".join(parts)
     if isinstance(anchors, str):
-        return f"{text}, continuity: {anchors}" if anchors else text
-    for name, desc in anchors.items():
-        if name != "world" and name.lower() in text.lower():
-            i = text.lower().index(name.lower()) + len(name)
-            i += 2 if text[i:i + 2] == "'s" else 0
-            text = f"{text[:i]} ({desc}){text[i:]}"
+        return f"{text}. {anchors}" if anchors else text
+    cast = [f"the {name}: {desc}" for name, desc in anchors.items()
+            if name != "world" and name.lower() in text.lower()]
+    if cast:
+        text += ". " + "; ".join(cast)
     if anchors.get("world"):
-        text += f", setting: {anchors['world']}"
+        text += f". Setting: {anchors['world']}"
     return text
 
 
