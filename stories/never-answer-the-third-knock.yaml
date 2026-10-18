@@ -125,7 +125,7 @@ lines:
     move: sink
   - text: It stopped outside my bedroom. Then it went *past*.
     plate: bedroom_shadow
-    frame: [0.75, 0.6, 1.7]
+    frame: [0.72, 0.45, 1.6]
   - text: From inside my closet, I heard my grandmother's voice.
     plate: bedroom
     frame: [0.4, 0.4, 1.6]

@@ -43,7 +43,8 @@ def _voice_onsets(voice: np.ndarray, sr: int, timeline) -> list[float | None]:
     hop = int(0.01 * sr)
     onsets = []
     for start, end, _ in timeline:
-        a, b = max(0, int((start - 0.5) * sr)), int(min(end, start + 1.5) * sr)
+        # Look from just before the line: any earlier and the last line's reverb tail reads as an onset.
+        a, b = max(0, int((start - 0.1) * sr)), int(min(end, start + 1.5) * sr)
         seg = voice[a:b]
         if seg.size < hop * 3:
             onsets.append(None)
