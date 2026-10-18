@@ -1,0 +1,92 @@
+"""Text-to-speech engines.
+
+Kokoro (open-source, runs locally, free) is the real narrator. eSpeak is a
+robotic-sounding fallback used only when the Kokoro model files are missing,
+so the pipeline can still be tested end to end.
+"""
+import ctypes
+import os
+from pathlib import Path
+
+import numpy as np
+
+MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+KOKORO_MODEL = MODELS_DIR / "kokoro-v1.0.onnx"
+KOKORO_VOICES = MODELS_DIR / "voices-v1.0.bin"
+
+
+class KokoroTTS:
+    name = "kokoro"
+
+    def __init__(self, voice: str, speed: float):
+        from kokoro_onnx import Kokoro
+
+        self.engine = Kokoro(str(KOKORO_MODEL), str(KOKORO_VOICES))
+        self.voice = voice
+        self.speed = speed
+
+    def synth(self, text: str):
+        samples, sr = self.engine.create(text, voice=self.voice, speed=self.speed, lang="en-us")
+        return np.asarray(samples, dtype=np.float32), sr
+
+
+_SYNTH_CALLBACK = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_short), ctypes.c_int, ctypes.c_void_p)
+
+
+class EspeakTTS:
+    name = "espeak (fallback)"
+
+    def __init__(self, voice: str, speed: float):
+        import espeakng_loader
+
+        data_path = espeakng_loader.get_data_path()
+        os.environ.setdefault("ESPEAK_DATA_PATH", data_path)
+        lib = ctypes.cdll.LoadLibrary(espeakng_loader.get_library_path())
+        lib.espeak_Initialize.restype = ctypes.c_int
+        lib.espeak_Synth.argtypes = [
+            ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_int,
+            ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_uint), ctypes.c_void_p,
+        ]
+        # 2 = AUDIO_OUTPUT_SYNCHRONOUS: samples are delivered to our callback.
+        self.sr = lib.espeak_Initialize(2, 0, str(Path(data_path).parent).encode(), 0)
+        self._chunks = []
+
+        def on_audio(wav, n, _events):
+            if wav and n > 0:
+                self._chunks.append(np.ctypeslib.as_array(wav, shape=(n,)).copy())
+            return 0
+
+        self._callback = _SYNTH_CALLBACK(on_audio)  # keep a reference so it isn't GC'd
+        lib.espeak_SetSynthCallback(self._callback)
+        lib.espeak_SetVoiceByName(b"en-us")
+        lib.espeak_SetParameter(1, int(150 * speed), 0)  # rate (words per minute)
+        lib.espeak_SetParameter(3, 30, 0)  # pitch, a bit low
+        self.lib = lib
+
+    def synth(self, text: str):
+        self._chunks = []
+        data = text.encode("utf-8") + b"\0"
+        self.lib.espeak_Synth(data, len(data), 0, 1, 0, 0, None, None)
+        self.lib.espeak_Synchronize()
+        audio = np.concatenate(self._chunks) if self._chunks else np.zeros(1, dtype=np.int16)
+        return audio.astype(np.float32) / 32768.0, self.sr
+
+
+def get_tts(voice: str, speed: float, engine: str = "auto"):
+    have_kokoro = KOKORO_MODEL.exists() and KOKORO_VOICES.exists()
+    if engine == "kokoro" or (engine == "auto" and have_kokoro):
+        if not have_kokoro:
+            raise SystemExit("Kokoro model files are missing. Run: python -m pipeline.download_models")
+        return KokoroTTS(voice, speed)
+    if engine == "auto":
+        print("  ! Kokoro model not found, using the robotic eSpeak fallback voice.")
+        print("    Run `python -m pipeline.download_models` for the real narrator.")
+    return EspeakTTS(voice, speed)
+
+
+def trim_silence(audio: np.ndarray, sr: int, threshold: float = 0.01, pad: float = 0.04) -> np.ndarray:
+    loud = np.flatnonzero(np.abs(audio) > threshold)
+    if loud.size == 0:
+        return audio
+    p = int(pad * sr)
+    return audio[max(0, loud[0] - p): loud[-1] + p]

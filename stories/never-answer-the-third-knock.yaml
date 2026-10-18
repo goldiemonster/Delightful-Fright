@@ -1,0 +1,43 @@
+# One line = one caption beat + one background shot.
+# Wrap words in *asterisks* to show them in red.
+# `visual` is a Pexels search term, or a file in assets/ (e.g. images/my-painting.jpg).
+# `impact: true` adds a low boom when that line starts (the hook always gets one).
+
+title: Never Answer the Third Knock
+voice: bm_george   # deep British male. Others: bm_lewis, am_michael, am_onyx, af_nicole
+speed: 0.92
+
+lines:
+  - text: My grandmother had one rule. Never answer the *third* knock.
+    visual: old wooden door dark
+  - text: The first knock is the wind. The second is the house settling.
+    visual: dark hallway night
+  - text: The third knock is something that *learned* how to knock.
+    visual: window rain night
+  - text: She died in March. Last week, I moved into her house.
+    visual: abandoned house
+  - text: Last night, I heard one knock. Then two.
+    visual: candle in darkness
+  - text: I held my breath, and waited for the third.
+    visual: dark staircase
+  - text: It never came.
+    visual: foggy forest night
+    pause: 0.8
+  - text: Then, from inside my closet, I heard my grandmother's voice.
+    visual: closet door dark
+    impact: true
+  - text: “Good. You remembered.”
+    visual: shadow on wall
+  - text: “Now… *let me out.*”
+    visual: old woman portrait dark
+    impact: true
+
+youtube:
+  title: Never Answer the Third Knock 🚪 #shorts #horror
+  description: |
+    My grandmother had one rule… and I finally understand why.
+
+    New short horror stories every week. Subscribe if you dare. 🕯️
+
+    #horrorstories #scarystories #creepy #horror #shorts
+  tags: [horror, scary stories, creepy, horror shorts, short horror story, scary, delightful fright]

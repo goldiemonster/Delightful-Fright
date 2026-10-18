@@ -1,0 +1,67 @@
+name: Render Shorts
+
+# Renders automatically when you add or edit a story, or on demand from the Actions tab.
+on:
+  push:
+    branches: [main]
+    paths: ["stories/**.yaml"]
+  workflow_dispatch:
+    inputs:
+      story:
+        description: "Story file to render (e.g. stories/never-answer-the-third-knock.yaml)"
+        required: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Pick stories to render
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_STORY: ${{ inputs.story }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            files="$INPUT_STORY"
+          else
+            files=$(git diff --name-only --diff-filter=AM HEAD^ HEAD -- 'stories/*.yaml' | tr '\n' ' ')
+          fi
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "Rendering: $files"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+
+      - run: pip install -r requirements.txt
+
+      - name: Cache narrator model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: kokoro-v1.0
+
+      - run: python -m pipeline.download_models
+
+      - name: Render
+        if: steps.pick.outputs.files != ''
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          FILES: ${{ steps.pick.outputs.files }}
+        run: python -m pipeline.render --engine kokoro $FILES
+
+      - uses: actions/upload-artifact@v4
+        if: steps.pick.outputs.files != ''
+        with:
+          name: shorts
+          path: out/
+          retention-days: 14
