@@ -1,7 +1,7 @@
 """Background visuals for each line, in priority order:
 
 1. A file you dropped in assets/ (image or video): your own art or public-domain paintings.
-2. An AI-generated cinematic still from the line's `scene` prompt (free, no key needed:
+2. An AI-generated still from the line's shot prompt (free, no key needed:
    Pollinations FLUX; or Hugging Face FLUX.1-schnell when HF_TOKEN is set).
 3. A free stock clip from Pexels for the line's `visual` search (needs PEXELS_API_KEY).
 4. A generated foggy night scene, so a render never fails.
@@ -28,6 +28,11 @@ IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 
 # Low-key and warm, like a room lit by one lamp (the channel's look); or cold, or sickly.
 GRADES = {
+    # Muted amber highlights over blue-grey shadows: the channel's ashcan-noir look.
+    "noir": (
+        "eq=contrast=1.15:brightness=-0.04:saturation=0.55:gamma=0.92,"
+        "colorbalance=rs=-0.04:gs=0.0:bs=0.06:rm=0.02:bm=-0.01:rh=0.08:gh=0.03:bh=-0.07"
+    ),
     "amber": (
         "eq=contrast=1.18:brightness=-0.05:saturation=0.82:gamma=0.9,"
         "colorbalance=rs=0.07:gs=0.01:bs=-0.08:rm=0.05:bm=-0.05:rh=0.03:bh=-0.06"
@@ -38,9 +43,9 @@ GRADES = {
 FINISH = "noise=alls=8:allf=t+u,vignette=PI/4.2"
 
 DEFAULT_STYLE = (
-    "cinematic horror film still, photorealistic, shot on 35mm film, low-key lighting, "
-    "deep black shadows, single warm practical light source, muted desaturated colours, "
-    "subtle film grain, eerie and quiet, vertical 9:16 composition, no text, no watermark"
+    "mature charcoal and graphite ashcan noir illustration, realistic adult anatomy, "
+    "legible faces and clues, heavy cross-hatched shadows, muted amber and blue-grey palette, "
+    "vertical 9:16 single frame, no collage, no text, no watermark"
 )
 
 MOVES = ["push_in", "drift_left", "pull_out", "rise", "push_in", "drift_right", "sink"]
@@ -194,16 +199,30 @@ def generate_scene(seed: int, dest: Path) -> Path:
     return dest
 
 
-def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int]) -> tuple[Path, str]:
+def shot_prompt(line: dict, anchors: str) -> str:
+    """Build a shot prompt the way the production bible does: anchors, camera, action, evidence."""
+    parts = [line.get("scene", "")]
+    if line.get("camera"):
+        parts.append(f"camera: {line['camera']}")
+    if line.get("action"):
+        parts.append(f"single physical action: {line['action']}")
+    if line.get("evidence"):
+        parts.append(f"clearly visible: {line['evidence']}")
+    if anchors and any(parts):
+        parts.append(f"continuity: {anchors}")
+    return ", ".join(p for p in parts if p)
+
+
+def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anchors: str = "") -> tuple[Path, str]:
     """Return (path, source label) for one line's visual."""
-    spec, scene = line.get("visual", ""), line.get("scene", "")
+    spec, scene = line.get("visual", ""), shot_prompt(line, anchors)
     if spec and (local := find_local(spec)):
         return local, "local"
     if scene and (still := fetch_ai_image(scene, style, seed, cache)):
         return still, "ai"
     if spec and (clip := fetch_pexels(spec, cache, used)):
         return clip, "pexels"
-    if scene and (clip := fetch_pexels(scene, cache, used)):
+    if line.get("scene") and (clip := fetch_pexels(line["scene"], cache, used)):
         return clip, "pexels"
     return generate_scene(seed, cache / f"scene_{seed}.jpg"), "generated"
 
@@ -246,10 +265,10 @@ def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int)
         yield img.transform((W, H), Image.EXTENT, box, Image.BICUBIC).tobytes()
 
 
-def render_segment(src: Path, duration: float, dest: Path, grade: str = "amber", move: str = "push_in",
+def render_segment(src: Path, duration: float, dest: Path, grade: str = "noir", move: str = "push_in",
                    impact: bool = False, seed: int = 0):
     """Render one line's background as a 1080x1920 clip."""
-    look = f"{GRADES.get(grade, GRADES['amber'])},{FINISH}"
+    look = f"{GRADES.get(grade, GRADES['noir'])},{FINISH}"
     if impact:  # a white flash that decays as the boom hits
         look += ",eq=brightness='if(lt(t,0.18),0.55*(1-t/0.18),0)':eval=frame"
     out = ["-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",

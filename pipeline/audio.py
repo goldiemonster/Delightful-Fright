@@ -45,6 +45,8 @@ def _impulse_response(sr: int, seconds: float, damp_hz: float, seed: int) -> np.
 
 def reverb(x: np.ndarray, sr: int, seconds: float = 1.6, wet: float = 0.25, damp_hz: float = 5000, seed: int = 7):
     wet_sig = signal.fftconvolve(x, _impulse_response(sr, seconds, damp_hz, seed))[: x.size]
+    # A noise IR can boost low notes by 20 dB or more; keep the wet signal at the dry level.
+    wet_sig *= np.sqrt(np.mean(x**2) / (np.mean(wet_sig**2) + 1e-12))
     return (1 - wet) * x + wet * wet_sig
 
 
@@ -53,6 +55,10 @@ def _place(out: np.ndarray, clip: np.ndarray, at: float, sr: int, gain: float = 
     j = min(out.size, i + clip.size)
     if j > i:
         out[i:j] += gain * clip[: j - i]
+
+
+def _peak1(x: np.ndarray) -> np.ndarray:
+    return x / (np.max(np.abs(x)) + 1e-9)
 
 
 def _fade(x: np.ndarray, sr: int, fade_in: float, fade_out: float) -> np.ndarray:
@@ -158,6 +164,26 @@ def static(sr: int, length: float = 1.5) -> np.ndarray:
     return _fade(out / (np.max(np.abs(out)) + 1e-9), sr, 0.05, 0.3).astype(np.float32)
 
 
+def ambience(kind: str, duration: float, sr: int, seed: int = 0) -> np.ndarray:
+    """A bed of room tone under everything: rain, wind, an empty room, or nothing."""
+    rng = np.random.default_rng(seed + 11)
+    t = _t(duration, sr)
+    noise = rng.standard_normal(t.size)
+    if kind == "rain":
+        out = _bandpass(noise, sr, 600, 9000) * 0.5
+        drops = (rng.random(t.size) < 0.0015) * rng.uniform(0.3, 1, t.size)
+        out += _bandpass(np.convolve(drops, np.exp(-np.arange(200) / 20), mode="same"), sr, 1500, 8000)
+    elif kind == "wind":
+        sweep = 0.5 + 0.5 * np.sin(2 * np.pi * 0.06 * t + rng.uniform(0, 6))
+        out = _lowpass(noise, sr, 500) * (0.4 + sweep) + _bandpass(noise, sr, 700, 1400) * sweep**3 * 0.4
+    elif kind == "room":
+        out = _lowpass(noise, sr, 300) * 0.6 + 0.05 * np.sin(2 * np.pi * 60 * t)  # air and a fridge hum
+    else:
+        return np.zeros(t.size, dtype=np.float32)
+    out = _fade(out, sr, 1.0, 1.5)
+    return (out / (np.max(np.abs(out)) + 1e-9)).astype(np.float32)
+
+
 SFX = {"boom": boom, "riser": riser, "whoosh": whoosh, "knock": knock,
        "heartbeat": heartbeat, "bell": bell, "static": static}
 
@@ -242,24 +268,29 @@ def _duck(narration: np.ndarray, sr: int, depth: float) -> np.ndarray:
 
 
 def mix(narration: np.ndarray, sr: int, work: Path, impacts: list[float], cuts: list[float],
-        sfx: list[tuple[float, str]], music: Path | None = None, music_level: float = 0.32,
-        seed: int = 0) -> np.ndarray:
+        sfx: list[tuple[float, str]], music: Path | None = None, music_level: float = 0.16,
+        room: str = "room", seed: int = 0) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """The final mix, plus its stems (voice, music, effects) at the same scale for review."""
     total = narration.size
     voice = process_voice(narration, sr, work)
     voice = np.pad(voice, (0, max(0, total - voice.size)))[:total]
 
     bed = load_music(music, total / sr, sr) if music else score(total / sr, sr, seed, impacts)
-    bed = bed * _duck(narration, sr, depth=0.45) * music_level
+    bed = bed * _duck(narration, sr, depth=0.6) * music_level
 
     fx = np.zeros(total, dtype=np.float32)
-    hit, rise, swish = boom(sr), riser(sr), whoosh(sr)
+    hit, rise, swish = _peak1(boom(sr)), riser(sr), whoosh(sr)
     for at in impacts:
         _place(fx, rise, at - rise.size / sr, sr, 0.22)
-        _place(fx, hit, at, sr, 0.75)
+        _place(fx, hit, at, sr, 0.3)
     for at in cuts:
         _place(fx, swish, at - 0.35, sr, 0.06)
     for at, name in sfx:
-        _place(fx, SFX[name](sr), at, sr, 0.5)
+        _place(fx, _peak1(SFX[name](sr)), at, sr, 0.14)
 
+    fx += ambience(room, total / sr, sr, seed) * _duck(narration, sr, depth=0.3) * 0.07
+
+    stems = {"voice": voice, "music": bed, "effects": fx}
     out = voice + bed + fx
-    return (out / (np.max(np.abs(out)) + 1e-9) * 0.89).astype(np.float32)
+    scale = 0.89 / (np.max(np.abs(out)) + 1e-9)
+    return (out * scale).astype(np.float32), {k: (v * scale).astype(np.float32) for k, v in stems.items()}

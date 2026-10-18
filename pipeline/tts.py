@@ -1,8 +1,12 @@
 """Text-to-speech engines.
 
-Kokoro (open-source, runs locally, free) is the real narrator. eSpeak is a
-robotic-sounding fallback used only when the Kokoro model files are missing,
-so the pipeline can still be tested end to end.
+Kokoro (open-source, runs locally, free) is the default narrator. Cartesia
+Sonic (the voices the channel's published episodes use, e.g. Charlotte) is used
+when the story sets `cartesia_voice` and CARTESIA_API_KEY is available. eSpeak
+is a robotic-sounding fallback used only when the Kokoro model files are
+missing, so the pipeline can still be tested end to end.
+
+Speech is never time-stretched: what the engine says is what plays, at 1.00x.
 """
 import ctypes
 import os
@@ -39,6 +43,37 @@ class KokoroTTS:
     def synth(self, text: str):
         samples, sr = self.engine.create(text, voice=self.voice, speed=self.speed, lang="en-us")
         return np.asarray(samples, dtype=np.float32), sr
+
+
+class CartesiaTTS:
+    name = "cartesia"
+    SR = 44100
+
+    def __init__(self, voice_id: str, model: str = "sonic-3"):
+        import requests
+
+        self.session = requests.Session()
+        self.session.headers.update({
+            "X-API-Key": os.environ["CARTESIA_API_KEY"],
+            "Cartesia-Version": "2025-04-16",
+        })
+        self.voice_id = voice_id
+        self.model = model
+
+    def synth(self, text: str):
+        r = self.session.post(
+            "https://api.cartesia.ai/tts/bytes",
+            json={
+                "model_id": self.model,
+                "transcript": text,
+                "voice": {"mode": "id", "id": self.voice_id},
+                "language": "en",
+                "output_format": {"container": "raw", "encoding": "pcm_f32le", "sample_rate": self.SR},
+            },
+            timeout=120,
+        )
+        r.raise_for_status()
+        return np.frombuffer(r.content, dtype=np.float32).copy(), self.SR
 
 
 _SYNTH_CALLBACK = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_short), ctypes.c_int, ctypes.c_void_p)
@@ -83,7 +118,12 @@ class EspeakTTS:
         return audio.astype(np.float32) / 32768.0, self.sr
 
 
-def get_tts(voice: str, speed: float, engine: str = "auto"):
+def get_tts(voice: str, speed: float, engine: str = "auto", cartesia_voice: str | None = None,
+            cartesia_model: str = "sonic-3"):
+    if engine == "cartesia" or (engine in ("auto", "kokoro") and cartesia_voice and os.environ.get("CARTESIA_API_KEY")):
+        if not (cartesia_voice and os.environ.get("CARTESIA_API_KEY")):
+            raise SystemExit("Cartesia needs `cartesia_voice:` in the story and a CARTESIA_API_KEY secret.")
+        return CartesiaTTS(cartesia_voice, cartesia_model)
     have_kokoro = KOKORO_MODEL.exists() and KOKORO_VOICES.exists()
     if engine == "kokoro" or (engine == "auto" and have_kokoro):
         if not have_kokoro:

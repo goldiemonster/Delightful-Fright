@@ -1,69 +1,117 @@
-# One line = one caption beat + one shot. Aim for 60–75 seconds (about 160–190 words).
+# One line = one caption beat + one shot. Aim for 75–90 seconds (about 190–230 words).
+# Build the ending first. Give the narrator a goal, a concrete anomaly, two escalating
+# discoveries, an active choice, and a revelation the story has earned.
 #
-#   text:    what the narrator says. Wrap words in *asterisks* to show them in red.
-#   scene:   what the AI should paint for this shot (free, no key needed).
-#   visual:  optional: a file in assets/ (e.g. images/my-painting.jpg), or a Pexels search.
-#   impact:  true = riser + boom + flash + camera shake when the line starts (the hook always gets one).
-#   sfx:     knock | heartbeat | bell | static | whoosh | boom | riser (one or a list)
-#   pause:   seconds of silence after the line.
-#   move:    push_in | pull_out | drift_left | drift_right | rise | sink (default: varies per shot)
+# Per line:
+#   text:      exactly what the narrator says. Wrap words in *asterisks* to show them in red.
+#   scene:     what the frame shows (subject, place, light).
+#   camera:    optional, e.g. "low angle close-up", "wide from the doorway".
+#   action:    optional, the single physical action in the frame.
+#   evidence:  optional, the clue or state that must be visible.
+#   visual:    optional, a file in assets/ (e.g. images/my-painting.jpg), or a Pexels search.
+#   impact:    true = riser + boom + flash + camera shake when the line starts (the hook always gets one).
+#   sfx:       knock | heartbeat | bell | static | whoosh | boom | riser (one or a list)
+#   pause:     seconds of silence after the line (silence only: speech is never stretched).
+#   move:      push_in | pull_out | drift_left | drift_right | rise | sink (default: varies per shot)
 
 title: Never Answer the Third Knock
-voice: bm_george:0.7,am_onyx:0.3   # blend Kokoro voices; or one, e.g. bm_george, am_onyx, bm_lewis
+
+# Narrator: Kokoro (free) by default; blend voices with weights.
+voice: bm_george:0.7,am_onyx:0.3
 speed: 0.9
-grade: amber          # amber (warm, low-key) | cold | green
-music: auto           # auto = generated score; or assets/music/your-track.mp3; or none
-# style: optional art direction added to every scene prompt (defaults to dark cinematic photoreal)
+# Or Cartesia Sonic, as on the channel: set a voice id here and a CARTESIA_API_KEY secret.
+# cartesia_voice: your-voice-id
+
+grade: noir        # noir (amber over blue-grey) | amber | cold | green
+music: auto        # auto = generated score; or assets/music/your-track.mp3; or none
+ambience: room     # room | rain | wind | none
+# style: overrides the art direction added to every shot (default: charcoal/graphite ashcan noir)
+
+# Continuity anchors, added to every shot so faces, rooms and props stay consistent.
+anchors:
+  narrator: man in his thirties, short dark hair, stubble, grey wool sweater
+  grandmother: thin woman in her eighties, white hair in a bun, black cardigan
+  house: old farmhouse, narrow hallway, heavy oak front door at one end, bedroom with a tall wardrobe
+  light: single oil lamp or moonlight, deep shadows
 
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.
-    scene: close-up of an elderly woman's wrinkled hand resting on an old brass door handle, candlelight, dark farmhouse hallway
+    scene: the grandmother's hand resting on the brass handle of the oak front door
+    camera: tight close-up
+    evidence: lamplight on her knuckles
   - text: The first knock is the wind. The second is the house settling.
-    scene: heavy wooden front door of an old farmhouse at night, seen from inside a dark hallway, thin moonlight under the door
+    scene: the oak front door at the end of the dark hallway, moonlight under the door
+    camera: wide from the far end of the hallway
     sfx: knock
-  - text: The third knock is something that *learned* how to knock.
-    scene: extreme close-up of weathered wooden door panel with deep scratch marks, lit by a single oil lamp
-  - text: She died in March.
-    scene: empty rocking chair beside a cold fireplace, dust in a shaft of grey morning light
-  - text: Last week, I moved into her house.
-    scene: cardboard moving boxes in a dim old living room, floral wallpaper peeling, one lamp on
+  - text: The third is something that *learned* how to knock.
+    scene: the outside of the oak door, deep scratch marks in the wood
+    camera: extreme close-up
+    evidence: three parallel gouges at shoulder height
+  - text: She died in March. Last week, I moved into her house.
+    scene: the narrator carrying a cardboard box into the dim hallway, her empty rocking chair in the corner
+    camera: medium shot from inside the doorway
   - text: Her rule was still taped inside the front door, in her handwriting.
-    scene: yellowed handwritten paper note taped to the inside of an old wooden door, lamp light, shallow depth of field
-  - text: Last night, at 3 a.m., I heard one knock.
-    scene: man lying awake in bed in a dark old bedroom, eyes open, staring at the ceiling, faint blue moonlight
+    scene: a yellowed handwritten note taped to the inside of the oak door
+    camera: close-up
+    evidence: the words never answer the third knock, in shaky handwriting
+  - text: Last night, at three in the morning, I heard one knock.
+    scene: the narrator lying awake in bed, eyes open, moonlight across the blanket
+    camera: overhead
     sfx: knock
-    pause: 0.6
+    pause: 0.7
   - text: Then two.
-    scene: dark narrow farmhouse hallway leading to the front door, a sliver of moonlight across the floorboards
-    pause: 0.8
+    scene: the hallway seen from the bedroom door, the front door far away in darkness
+    camera: wide, from the bedroom doorway
+    pause: 0.9
   - text: I held my breath, and waited for the third.
-    scene: man's face in darkness half lit by a phone screen, holding his breath, sweat on his temple
+    scene: the narrator's face in darkness, half lit by moonlight, holding his breath
+    camera: extreme close-up
     sfx: heartbeat
   - text: It never came.
-    scene: front door from a distance at the end of a pitch black hallway, completely still
+    scene: the oak front door, perfectly still, at the end of the black hallway
+    camera: slow wide
     pause: 1.0
-  - text: Instead, something dragged slowly along the hallway floor.
-    scene: low angle shot along old wooden floorboards in a dark hallway, long drag marks in the dust
-  - text: It stopped outside my bedroom.
-    scene: bedroom door slightly ajar, darkness beyond, warm lamp light spilling into the black gap
-  - text: Then, from inside my closet, I heard my grandmother's voice.
-    scene: old wooden wardrobe door open a crack in a dark bedroom, total blackness inside
+  - text: Instead, something dragged itself along the hallway floor.
+    scene: the hallway floorboards, fresh drag marks through the dust leading toward the bedroom
+    camera: low angle along the floor
+    evidence: drag marks ending at the bedroom door
+  - text: It stopped outside my bedroom. Then it went *past*.
+    scene: the narrator sitting up in bed, staring at the gap under the bedroom door
+    camera: medium, from beside the bed
+    evidence: a shadow moving across the light under the door
+  - text: From inside my closet, I heard my grandmother's voice.
+    scene: the tall wardrobe in the bedroom, its door open a crack, total blackness inside
+    camera: wide, slightly low
     impact: true
   - text: “Good. You remembered.”
-    scene: pale elderly woman's eye visible through the crack of a wardrobe door, in deep shadow
-  - text: My hand found the light switch. Nothing happened.
-    scene: trembling hand pressing an old round light switch on a dark bedroom wall
-  - text: The closet door creaked open on its own.
-    scene: wardrobe door swinging open into darkness, dusty old coats hanging, faint shape behind them
-  - text: Her coats were still hanging there. All of them were wet.
-    scene: close-up of old wool coats hanging in a wardrobe, dripping with dark water, candle light
-  - text: “Every rule has a reason,” she whispered.
-    scene: silhouette of a hunched old woman standing in the back of a wardrobe, face hidden in shadow
-  - text: “Mine was to keep it *out*.”
-    scene: the old farmhouse front door seen from outside at night, fog, the door slowly opening by itself
+    scene: the grandmother's pale eye visible through the crack of the wardrobe door
+    camera: extreme close-up
+  - text: “Now open the front door. Quickly. Before it finds the way in.”
+    scene: the narrator gripping the bedroom door frame, looking down the hallway toward the front door
+    camera: over the shoulder
+  - text: I ran for the door. Whatever was outside had stopped knocking.
+    scene: the narrator running down the dark hallway toward the oak door
+    camera: from behind, low
+    action: running, one hand reaching ahead
+  - text: I turned the lock. And I pulled it open.
+    scene: the narrator's hand turning an old iron key in the oak door's lock
+    camera: tight close-up
+    action: turning the key
+  - text: The porch was empty. Just fog, and her footprints in the mud, leading *away* from the house.
+    scene: the empty porch at night in fog, a line of small bare footprints in the mud leading away
+    camera: wide from the doorway
+    evidence: footprints walking away from the house
+  - text: She hadn't been keeping something out.
+    scene: the narrator's face in the doorway, lit from behind by the oil lamp, realising
+    camera: close-up
     pause: 0.6
-  - text: Then the knocking started again. From inside the closet.
-    scene: extreme close-up of the inside of a wardrobe door, knuckle marks pressed into the wood
+  - text: She'd been keeping it *in*.
+    scene: the hallway behind the narrator, the wardrobe's black doorway visible at the far end
+    camera: wide, looking back into the house
+    pause: 0.8
+  - text: Behind me, from inside the closet, came the third knock.
+    scene: the wardrobe door from inside the bedroom, its door now wide open, something long and pale in the darkness
+    camera: slow push toward the wardrobe
     impact: true
     sfx: knock
 
@@ -72,7 +120,7 @@ youtube:
   description: |
     My grandmother had one rule. Last night I finally learned why.
 
-    A little dread before bed? New short horror stories every week. 🕯️
+    A little dread before bed? Sleep was already overrated anyway. 🕯️
 
     #horror #scarystories #shorts #horrorshorts #creepy
   tags: [horror, scary stories, creepy, horror shorts, short horror story, scary, delightful fright]

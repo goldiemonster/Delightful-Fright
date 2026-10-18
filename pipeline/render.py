@@ -14,13 +14,13 @@ import numpy as np
 import soundfile as sf
 import yaml
 
-from . import align, audio, captions, tts, visuals
+from . import align, audio, captions, qa, tts, visuals
 
 ROOT = Path(__file__).resolve().parent.parent
 PAUSE_AFTER_HOOK = 0.7
 PAUSE = 0.45
 END_HOLD = 1.6
-LONG_WARNING = 90.0
+LONG_WARNING = 95.0
 LOUDNESS = "loudnorm=I=-14:TP=-1.5:LRA=11"  # YouTube's playback loudness
 
 
@@ -55,9 +55,10 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     print(f"Rendering “{story['title']}” ({len(lines)} lines)")
 
     # 1. Narration, one line at a time so we know exactly when each line starts.
-    narrator = tts.get_tts(story.get("voice", "bm_george"), float(story.get("speed", 0.92)), engine)
+    narrator = tts.get_tts(story.get("voice", "bm_george"), float(story.get("speed", 0.92)), engine,
+                           story.get("cartesia_voice"), story.get("cartesia_model", "sonic-3"))
     print(f"  narrator: {narrator.name}")
-    clips, timeline, word_times, t, sr = [], [], [], 0.0, None
+    clips, timeline, word_times, coverages, t, sr = [], [], [], [], 0.0, None
     for i, line in enumerate(lines):
         wav, sr = narrator.synth(captions.strip_markup(line["text"]))
         wav = tts.trim_silence(wav, sr)
@@ -66,7 +67,9 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
         gap = float(line.get("pause", gap)) + (END_HOLD if i == len(lines) - 1 else 0)
         timeline.append((t, t + speak, t + speak + gap))
         script_words = [w for w, _ in captions.words(line["text"])]
-        word_times.append(align.word_times(wav, sr, script_words, t))
+        times, heard = align.word_times(wav, sr, script_words, t)
+        word_times.append(times)
+        coverages.append(align.coverage(script_words, heard))
         clips.append(np.concatenate([wav, np.zeros(int(gap * sr), dtype=np.float32)]))
         t += speak + gap
     narration = np.concatenate(clips)
@@ -85,18 +88,24 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
             sfx.append((start, name))
     music = story.get("music")
     music_path = ROOT / music if music and music not in ("auto", "none") else None
-    mixed = audio.mix(narration, sr, work, impacts, cuts, sfx, music_path,
-                      music_level=0.0 if music == "none" else float(story.get("music_level", 0.32)),
-                      seed=seed_base)
+    mixed, stems = audio.mix(narration, sr, work, impacts, cuts, sfx, music_path,
+                             music_level=0.0 if music == "none" else float(story.get("music_level", 0.16)),
+                             room=story.get("ambience", "room"), seed=seed_base)
     sf.write(work / "audio.wav", mixed, sr)
+    (out_dir / "stems").mkdir(exist_ok=True)
+    for name, stem in stems.items():
+        sf.write(out_dir / "stems" / f"{name}.wav", stem, sr)
 
     # 3. Visuals: one shot per line.
     style = story.get("style", visuals.DEFAULT_STYLE)
-    grade = story.get("grade", "amber")
+    grade = story.get("grade", "noir")
+    anchors = story.get("anchors", "")
+    if isinstance(anchors, dict):
+        anchors = "; ".join(f"{k}: {v}" for k, v in anchors.items())
     used: set[int] = set()
     concat = []
     for i, (line, (start, _, end)) in enumerate(zip(lines, timeline)):
-        src, label = visuals.resolve(line, style, seed_base + i, cache, used)
+        src, label = visuals.resolve(line, style, seed_base + i, cache, used, anchors)
         seg = work / f"seg_{i:02d}.mp4"
         impact = i == 0 or bool(line.get("impact"))
         move = line.get("move", visuals.MOVES[i % len(visuals.MOVES)])
@@ -147,6 +156,10 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     ]
     (out_dir / "upload.txt").write_text("\n".join(meta), encoding="utf-8")
 
+    passed = qa.run(final, [line["text"] for line in lines], coverages, timeline, stems, sr)
+    if not passed:
+        print("  ! QA found problems: see qa.txt before publishing")
+
     if not keep_work:
         shutil.rmtree(work)
     print(f"Done → {final}")
@@ -157,7 +170,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("stories", nargs="+", type=Path, help="story YAML file(s)")
     ap.add_argument("--out", type=Path, default=ROOT / "out")
-    ap.add_argument("--engine", choices=["auto", "kokoro", "espeak"], default="auto")
+    ap.add_argument("--engine", choices=["auto", "kokoro", "cartesia", "espeak"], default="auto")
     ap.add_argument("--keep-work", action="store_true", help="keep intermediate files for debugging")
     args = ap.parse_args()
     for story in args.stories:

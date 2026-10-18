@@ -9,11 +9,12 @@ captions, sound design) plus ready-to-paste upload text. Costs $0.
 |---|---|---|
 | CEO / Head Writer | **You**: pick the stories, approve every upload | – |
 | Chief of Staff | Claude: drafts scripts with you, maintains this code | your existing plan |
-| Narrator | [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) TTS, voices can be blended (`bm_george:0.7,am_onyx:0.3`), then EQ, compression and a small room | free |
-| Art Director | AI cinematic stills from each line's `scene` prompt ([Pollinations](https://pollinations.ai) FLUX, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
-| Camera | `pipeline/visuals.py`: smooth push-ins, pans and handheld drift, camera shake and a flash on impacts, warm low-key grade, film grain | free |
-| Composer + Sound Designer | `pipeline/audio.py`: a generated dark score (drone, pad, sparse piano) that ducks under the voice, risers into booms, knocks, heartbeats, bells; or your own track | free |
+| Narrator | [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) TTS, voices can be blended (`bm_george:0.7,am_onyx:0.3`); or [Cartesia](https://cartesia.ai) Sonic (the channel's voices, e.g. Charlotte) with `cartesia_voice` + `CARTESIA_API_KEY`. Never time-stretched; EQ, compression and a small room | free / Cartesia plan |
+| Art Director | Charcoal/graphite ashcan-noir stills built like the production bible's shot prompts (continuity `anchors` + `scene`, `camera`, `action`, `evidence`) ([Pollinations](https://pollinations.ai) FLUX, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
+| Camera | `pipeline/visuals.py`: smooth push-ins, pans and handheld drift, camera shake and a flash on impacts, muted amber over blue-grey grade, film grain | free |
+| Composer + Sound Designer | `pipeline/audio.py`: a generated dark score (drone, pad, sparse piano) that ducks under the voice, room/rain/wind ambience, risers into booms, knocks, heartbeats, bells; or your own track | free |
 | Editor + Captions | FFmpeg + [faster-whisper](https://github.com/SYSTRAN/faster-whisper): captions timed to each spoken word with the current word lit, title card on the hook, mastered to YouTube's -14 LUFS | free |
+| QA | `pipeline/qa.py`: re-listens to every line with speech recognition (complete, in order), checks loudness, true peak, voice over music, the last 10 seconds and black frames; writes `qa.txt` and exports voice/music/effects stems for a listening pass | free |
 | Render Farm | GitHub Actions (2,000 free minutes/month on private repos; about 8–12 min per Short) | free |
 
 ## Make a Short
@@ -26,12 +27,17 @@ captions, sound design) plus ready-to-paste upload text. Costs $0.
 You can also re-render any story from **Actions → Render Shorts → Run workflow**.
 
 ### Writing tips that matter for Shorts
-- **Hook in the first line.** Say the title's promise straight away: the first 2 seconds decide the swipe.
-- **Aim for 60–75 seconds** (about 160–190 words, 18–24 lines). Short, plain sentences in first person.
-- **One image per line.** Write each `scene` like a film still: subject, place, light ("lit by one oil lamp").
-- **Escalate, then twist, then loop.** The last line should send people back to the first.
+- **Build the ending first.** Then give the narrator a goal, a concrete anomaly, two escalating
+  discoveries, an active choice, and a revelation the story has earned.
+- **Hook in the first line**, and **aim for 75–90 seconds** (about 190–230 words, 18–24 lines).
+- **One shot per line.** Put the cast, rooms and light in `anchors` once; give each line a `scene`
+  and, when it matters, a `camera`, a single `action`, and the `evidence` that must be visible.
 - Use `*asterisks*` for red words, `impact: true` for a riser + boom + flash, `sfx: knock` for sound
   effects, and `pause: 0.8` for silence. See the top of the sample story for every option.
+
+### Before you publish
+Each render writes `qa.txt` (PASS / FAIL / UNVERIFIED per check) and `stems/` next to the video.
+The checks measure; they don't listen, so play the video once at normal speed before uploading.
 
 ## One-time setup
 
@@ -40,6 +46,7 @@ Nothing is required: AI stills come free from Pollinations. Optional repo secret
 
 - `HF_TOKEN`: a free [Hugging Face token](https://huggingface.co/settings/tokens); stills then come from FLUX.1-schnell, which is faster and more reliable.
 - `POLLINATIONS_TOKEN`: a free [Pollinations token](https://auth.pollinations.ai) for higher rate limits.
+- `CARTESIA_API_KEY`: your [Cartesia](https://play.cartesia.ai) key, for stories that set `cartesia_voice`.
 - `PEXELS_API_KEY`: a free [Pexels key](https://www.pexels.com/api/), used for lines that have a `visual` search and no `scene`.
 
 Pull requests that touch a story or the pipeline render a preview Short automatically

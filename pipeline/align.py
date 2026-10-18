@@ -39,21 +39,31 @@ def estimate(words: list[str], start: float, end: float) -> list[tuple[float, fl
     return list(zip(edges[:-1], edges[1:]))
 
 
-def word_times(wav: np.ndarray, sr: int, words: list[str], offset: float) -> list[tuple[float, float]]:
-    """(start, end) in seconds for each script word, shifted by `offset`."""
+def coverage(words: list[str], heard: list[str] | None) -> float | None:
+    """Share of script words the recogniser actually heard, in order (None = not checked)."""
+    if heard is None:
+        return None
+    script = [_norm(w) for w in words]
+    matcher = difflib.SequenceMatcher(a=script, b=[_norm(h) for h in heard], autojunk=False)
+    return sum(n for _, _, n in matcher.get_matching_blocks()) / max(1, len(script))
+
+
+def word_times(wav: np.ndarray, sr: int, words: list[str], offset: float):
+    """(start, end) in seconds for each script word, shifted by `offset`, plus the words heard
+    (None when no recogniser is available)."""
     duration = wav.size / sr
     model = _whisper()
     if model is None or not words:
-        return estimate(words, offset, offset + duration)
+        return estimate(words, offset, offset + duration), None
 
     audio = wav if sr == 16000 else np.interp(
         np.arange(0, wav.size, sr / 16000), np.arange(wav.size), wav
     ).astype(np.float32)
-    segments, _ = model.transcribe(audio, language="en", word_timestamps=True, beam_size=1,
-                                   initial_prompt=" ".join(words))
+    # No prompt with the script here: the QA check needs to hear what was actually said.
+    segments, _ = model.transcribe(audio, language="en", word_timestamps=True, beam_size=1)
     heard = [w for seg in segments for w in (seg.words or [])]
     if not heard:
-        return estimate(words, offset, offset + duration)
+        return estimate(words, offset, offset + duration), []
 
     times: list[tuple[float, float] | None] = [None] * len(words)
     matcher = difflib.SequenceMatcher(a=[_norm(w) for w in words], b=[_norm(h.word) for h in heard], autojunk=False)
@@ -82,4 +92,4 @@ def word_times(wav: np.ndarray, sr: int, words: list[str], offset: float) -> lis
     for k, (s, e) in enumerate(times):
         nxt = times[k + 1][0] if k + 1 < len(times) else max(e, duration)
         out.append((offset + s, offset + max(e, nxt)))
-    return out
+    return out, [h.word for h in heard]

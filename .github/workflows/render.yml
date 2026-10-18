@@ -67,6 +67,7 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
+          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
           FILES: ${{ steps.pick.outputs.files }}
         run: python -m pipeline.render --engine kokoro $FILES
 
