@@ -72,11 +72,6 @@ plates:
     strength: 0.72
     seed: 21
     prompt: Long narrow farmhouse hallway at night, fresh drag marks smeared through the thick dust on the floorboards, leading along the floor toward the camera, oil lamp, empty rocking chair, oak front door at the end
-  door_hand_grandma:
-    from: door_inside
-    strength: 0.75
-    seed: 22
-    prompt: a thin wrinkled old woman's hand with a black cardigan sleeve resting on the brass handle of the heavy oak front door, yellowed note taped above, warm lamplight on her knuckles
   bedroom_shadow:
     from: bedroom
     strength: 0.7
@@ -85,8 +80,8 @@ plates:
 
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.
-    plate: door_hand_grandma
-    frame: [0.55, 0.45, 1.4]
+    plate: door_inside
+    frame: [0.4, 0.4, 2.0]
   - text: The first knock is the wind. The second is the house settling.
     plate: hallway
     frame: [0.5, 0.42, 1.35]
@@ -103,6 +98,7 @@ lines:
     frame: [0.45, 0.4, 1.6]
   - text: Last night, at three in the morning, I heard one knock.
     plate: bedroom
+    frame: [0.45, 0.3, 1.8]
     sfx: knock
     pause: 0.7
   - text: Then two.
@@ -112,7 +108,7 @@ lines:
     pause: 0.9
   - text: I held my breath, and waited for the third.
     plate: bedroom
-    frame: [0.42, 0.66, 1.8]
+    frame: [0.2, 0.35, 2.2]
     sfx: creak
   - text: It never came.
     plate: hallway
@@ -128,7 +124,7 @@ lines:
     frame: [0.7, 0.32, 2.1]
   - text: From inside my closet, I heard my grandmother's voice.
     plate: bedroom
-    frame: [0.4, 0.4, 1.6]
+    frame: [0.38, 0.33, 2.0]
     move: push_in
     impact: true
   - text: “Good. You remembered.”
