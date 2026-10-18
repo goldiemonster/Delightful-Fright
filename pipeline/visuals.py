@@ -1,16 +1,22 @@
 """Background visuals for each line, in priority order:
 
 1. A file you dropped in assets/ (image or video): your own art or public-domain paintings.
-2. An AI-generated still from the line's shot prompt (free, no key needed:
-   Pollinations FLUX, then the AI Horde community cluster when Pollinations is
-   rate-limited; or Hugging Face FLUX.1-schnell when HF_TOKEN is set).
-3. A free stock clip from Pexels for the line's `visual` search (needs PEXELS_API_KEY).
-4. A generated foggy night scene, so a render never crashes. It shows nothing
+2. A master plate (`plate:` on the line): one painting per room or character, painted once
+   and reused for every shot set there, optionally reframed (`frame:`) or edited from another
+   plate (a hand on the door, the wardrobe now open). This is what keeps faces, rooms and props
+   identical from shot to shot.
+3. An AI-generated still from the line's own shot prompt.
+4. A free stock clip from Pexels for the line's `visual` search (needs PEXELS_API_KEY).
+5. A generated foggy night scene, so a render never crashes. It shows nothing
    from the story, so QA fails any video that uses it.
+
+Paintings come from Hugging Face FLUX.1-schnell (HF_TOKEN), Pollinations FLUX (POLLINATIONS_TOKEN;
+its free tier stamps a watermark, so it is skipped without a token) or the free AI Horde cluster.
 
 Stills get smooth, sub-pixel camera moves (push-ins, pans, handheld drift)
 rendered frame by frame, then the channel's colour grade, grain and vignette.
 """
+import base64
 import hashlib
 import io
 import os
@@ -92,27 +98,37 @@ def _huggingface(prompt: str, seed: int) -> bytes | None:
 
 
 def _pollinations(prompt: str, seed: int) -> bytes | None:
+    token = os.environ.get("POLLINATIONS_TOKEN")
+    if not token:  # the free tier stamps "pollinations.ai" on the image
+        return None
     url = "https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt)
     params = {"width": 1080, "height": 1920, "seed": seed, "model": "flux", "nologo": "true"}
-    headers = {}
-    if token := os.environ.get("POLLINATIONS_TOKEN"):
-        headers["Authorization"] = f"Bearer {token}"
+    headers = {"Authorization": f"Bearer {token}"}
     r = requests.get(url, params=params, headers=headers, timeout=180)
     r.raise_for_status()
     return r.content
 
 
-def _aihorde(prompt: str, seed: int) -> bytes | None:
-    """AI Horde (aihorde.net): free volunteer GPUs. Slow for anonymous users, but it never runs out."""
+def _aihorde(prompt: str, seed: int, size: tuple[int, int] = (576, 1024), source: Path | None = None,
+             strength: float = 0.55) -> bytes | None:
+    """AI Horde (aihorde.net): free volunteer GPUs. Slow for anonymous users, but it never runs out.
+    With `source`, it repaints that image (img2img) so an edit keeps the original's room and light."""
     api, key = "https://aihorde.net/api/v2", os.environ.get("AIHORDE_API_KEY", "0000000000")
     headers = {"apikey": key, "Client-Agent": "delightful-fright:1:github"}
-    params = {"sampler_name": "k_euler", "cfg_scale": 1, "steps": 6, "width": 576, "height": 1024, "seed": str(seed), "n": 1}
-    body = {"prompt": prompt + " ### text, watermark, cartoon, anime, blurry, deformed hands", "params": params,
+    params = {"sampler_name": "k_euler", "cfg_scale": 1, "steps": 8, "width": size[0], "height": size[1],
+              "seed": str(seed), "n": 1}
+    body = {"prompt": prompt + " ### text, watermark, signature, logo, cartoon, anime, blurry, deformed hands, "
+                               "extra fingers", "params": params,
             "models": ["Flux.1-Schnell fp8 (Compact)"], "r2": True, "nsfw": False, "censor_nsfw": True}
+    if source is not None:
+        buf = io.BytesIO()
+        Image.open(source).convert("RGB").resize(size, Image.LANCZOS).save(buf, "WEBP", quality=92)
+        body.update(source_image=base64.b64encode(buf.getvalue()).decode(), source_processing="img2img")
+        params["denoising_strength"] = strength
     r = requests.post(f"{api}/generate/async", json=body, headers=headers, timeout=60)
     r.raise_for_status()
     job = r.json()["id"]
-    deadline = time.time() + 1200
+    deadline = time.time() + 1800
     while time.time() < deadline:
         time.sleep(15)
         s = requests.get(f"{api}/generate/check/{job}", headers=headers, timeout=30).json()
@@ -124,6 +140,38 @@ def _aihorde(prompt: str, seed: int) -> bytes | None:
                 raise requests.RequestException("AI Horde returned no image")
             return requests.get(gens[0]["img"], timeout=120).content
     raise requests.RequestException("AI Horde timed out")
+
+
+PLATE_SIZE = (768, 1344)  # master plates are painted larger, so reframed shots stay sharp
+
+
+def fetch_plate(name: str, plates: dict, style: str, cache: Path) -> Path | None:
+    """Paint (or reuse) the master plate `name`. A plate is a prompt, or a dict with `prompt`
+    and optionally `from: <plate>` + `strength` to repaint another plate with a change."""
+    spec = plates[name] if isinstance(plates[name], dict) else {"prompt": plates[name]}
+    seed = int(spec.get("seed", sum(map(ord, name)) * 7))
+    full = f"{spec['prompt']}. {style}"
+    parent = None
+    if spec.get("from"):
+        parent = fetch_plate(spec["from"], plates, style, cache)
+        if parent is None:
+            return None
+    strength = float(spec.get("strength", 0.55))
+    key = f"{full}|{seed}|{parent.name if parent else ''}|{strength if parent else ''}"
+    dest = cache / f"plate_{name}_{hashlib.sha1(key.encode()).hexdigest()[:12]}.jpg"
+    if dest.exists():
+        return dest
+    print(f"  painting plate {name}" + (f" (from {spec['from']})" if parent else ""))
+    for attempt in range(3):
+        try:
+            data = _aihorde(full, seed + attempt, PLATE_SIZE, parent, strength)
+        except requests.RequestException as e:
+            print(f"  ! plate {name} attempt {attempt + 1} failed: {e}")
+            continue
+        if data and _valid_image(data):
+            Image.open(io.BytesIO(data)).convert("RGB").save(dest, quality=95)
+            return dest
+    return None
 
 
 _unreachable: set = set()
@@ -288,11 +336,17 @@ def shot_prompt(line: dict, anchors: dict | str) -> str:
     return text
 
 
-def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anchors: dict | str = "") -> tuple[Path, str]:
+def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anchors: dict | str = "",
+            plates: dict | None = None) -> tuple[Path, str]:
     """Return (path, source label) for one line's visual."""
     spec, scene = line.get("visual", ""), shot_prompt(line, anchors)
     if spec and (local := find_local(spec)):
         return local, "local"
+    if line.get("plate"):
+        if not plates or line["plate"] not in plates:
+            raise SystemExit(f"Line uses plate {line['plate']!r}, which isn't defined under plates:")
+        if still := fetch_plate(line["plate"], plates, style, cache):
+            return still, "plate"
     if scene and (still := fetch_ai_image(scene, style, seed, cache)):
         return still, "ai"
     if spec and (clip := fetch_pexels(spec, cache, used)):
@@ -319,10 +373,26 @@ def _expose(img: Image.Image) -> Image.Image:
     return img if g >= 1 else img.point([round(255 * (i / 255) ** g) for i in range(256)] * 3)
 
 
-def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int):
+def _reframe(img: Image.Image, frame) -> Image.Image:
+    """Cut a 9:16 shot out of a plate: frame = [centre x, centre y, zoom], x/y as 0-1 of the plate."""
+    cx, cy, zoom = (list(frame) + [1.0])[:3]
+    cw = min(img.width, img.height * W / H) / max(float(zoom), 1.0)
+    ch = cw * H / W
+    x = min(max(cx * img.width - cw / 2, 0), img.width - cw)
+    y = min(max(cy * img.height - ch / 2, 0), img.height - ch)
+    shot = img.crop((round(x), round(y), round(x + cw), round(y + ch)))
+    if W / shot.width > 1.8:  # a tight reframe is upscaled a lot: restore some edge detail
+        shot = shot.resize((W, H), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2, percent=60, threshold=3))
+    return shot
+
+
+def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int, frame=None):
     """Yield raw RGB frames of a slow camera move over a still image."""
     frames = max(1, round(duration * FPS))
-    img = _expose(Image.open(src).convert("RGB"))
+    img = Image.open(src).convert("RGB")
+    if frame:
+        img = _reframe(img, frame)
+    img = _expose(img)
     # Cover the frame with 16% headroom so the camera can move without showing edges.
     scale = max(W / img.width, H / img.height) * 1.16
     img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
@@ -358,7 +428,7 @@ def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int)
 
 
 def render_segment(src: Path, duration: float, dest: Path, grade: str = "channel", move: str = "push_in",
-                   impact: bool = False, seed: int = 0):
+                   impact: bool = False, seed: int = 0, frame=None):
     """Render one line's background as a 1080x1920 clip."""
     look = f"{GRADES.get(grade, GRADES['channel'])},{FINISH}"
     if impact:  # the light falters for a moment, like a lamp about to go out
@@ -377,8 +447,8 @@ def render_segment(src: Path, duration: float, dest: Path, grade: str = "channel
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
            "-r", str(FPS), "-i", "-", "-vf", look, *out]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    for frame in _still_frames(src, duration, move, impact, seed):
-        proc.stdin.write(frame)
+    for raw in _still_frames(src, duration, move, impact, seed, frame):
+        proc.stdin.write(raw)
     proc.stdin.close()
     if proc.wait():
         raise subprocess.CalledProcessError(proc.returncode, cmd)

@@ -33,12 +33,18 @@ You can also re-render any story from **Actions → Render Shorts → Run workfl
 - **One shot per line.** Describe each character once in `anchors` and the place and light in
   `anchors.world`; give each line a `scene` that names who is in it ("the narrator ..."), and,
   when it matters, a `camera`, a single `action`, and the `evidence` that must be visible.
+- **Keep the picture consistent with `plates`.** Paint one master per room under `plates:` and
+  point each line at one with `plate:`, reframing it with `frame: [x, y, zoom]`. A plate with
+  `from: hallway` and `strength: 0.5` is an edit of that master (a hand at the door, a shadow on
+  the wall), so the room and the light never change between shots. Keep faces out of frame:
+  hands, sleeves and silhouettes stay consistent where AI-painted faces drift.
 - Use `*asterisks*` for amber words, `impact: true` for a silence, low swell and faltering light, `sfx: knock` for sound
   effects, and `pause: 0.8` for silence. See the top of the sample story for every option.
 
 ### Before you publish
 Each render writes `qa.txt` (PASS / FAIL / UNVERIFIED per check) and `stems/` next to the video.
-The checks measure; they don't listen, so play the video once at normal speed before uploading.
+The checks measure; they don't listen, so play the video once at normal speed before uploading,
+and look over `contact_sheet.jpg` (one frame per line) for faces or rooms that changed.
 If no image source was reachable, shots fall back to a plain fog placeholder and the
 "Story shots" check FAILS: re-render where the image service is reachable (GitHub Actions is).
 

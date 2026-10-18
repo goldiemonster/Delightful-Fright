@@ -9,6 +9,10 @@
 #   action:    optional, the single physical action in the frame.
 #   evidence:  optional, the clue or state that must be visible.
 #   visual:    optional, a file in assets/ (e.g. images/my-painting.jpg), or a Pexels search.
+#   plate:     optional, a master painting from `plates:` below. Every shot set in the same room
+#              uses the same painting, so the room, light and props never change between shots.
+#   frame:     optional with plate: [centre x, centre y, zoom] to cut a closer shot out of it
+#              (x and y from 0 to 1 across the painting; zoom 1 = the whole painting).
 #   impact:    true = the score drops out, a low swell rises, and the light falters (the hook always gets one).
 #   sfx:       knock | creak | swell | bell | static | heartbeat | whoosh | boom | riser (one or a list)
 #   pause:     seconds of silence after the line (silence only: speech is never stretched).
@@ -25,9 +29,11 @@ speed: 0.9
 grade: channel     # channel (lamp-lit warm over blue-black) | noir | amber | cold | green
 music: auto        # auto = generated eerie score; or assets/music/your-track.mp3; or none
 ambience: room     # room | rain | wind | none
-# style: overrides the art direction added to every shot (default: the channel's gritty painted realism)
+# The art direction added to every painting (the channel's gritty painted realism, lamp-lit).
+style: Warm-toned gritty cinematic digital painting, dark graphic novel realism, richly detailed textured brushwork, warm amber oil-lamp light against deep blue-black shadows, grime and worn wood, low-key lighting, quiet unsettling mood
 
-# Continuity anchors keep faces, rooms and props the same from shot to shot.
+# Continuity anchors describe people and places in shots that have their own `scene:` prompt.
+# For real consistency, use plates (below) instead: AI redraws a face differently every time.
 # A named anchor is described in every shot whose scene mentions it (so write
 # "the narrator ...", "the grandmother's hand ..."); `world` goes into every shot.
 anchors:
@@ -35,84 +41,140 @@ anchors:
   grandmother: thin woman in her eighties, white hair in a bun, black cardigan
   world: old isolated farmhouse at night, bare wooden floors, lit only by warm amber oil lamps, deep shadows
 
+# Master plates: one painting per room, painted once and reused by every shot set there.
+# The narrator is first-person: we see his hands (grey wool sleeve) and, once, his silhouette,
+# never a full face, so he can't change between shots. `from:` repaints another plate with a
+# change (strength 0-1: how much may change), keeping its room and light.
+plates:
+  hallway:
+    seed: 11
+    prompt: Long narrow hallway inside an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps. Seen from the far end of the hall at eye level, looking toward the heavy oak front door with a brass handle at the end of the hall, a thin line of pale light under the door. An oil lamp on a small side table halfway down, an empty wooden rocking chair beside it. Dusty floorboards, one-point perspective, no people
+  door_inside:
+    seed: 12
+    prompt: "Close view of the inside of a heavy old oak front door in an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps: a brass door handle, an old iron key in the lock below it, and a yellowed handwritten paper note taped to the door at eye level. Warm lamplight from the left, deep shadows, no people"
+  door_outside:
+    seed: 13
+    prompt: Outside of a heavy old oak front door at night on a farmhouse porch, three deep parallel scratch gouges torn into the wood at shoulder height, cold fog, a faint warm glow of lamplight under the door, damp porch boards, no people
+  porch:
+    seed: 14
+    prompt: View from an open farmhouse front doorway at night out onto an empty wooden porch and a muddy yard swallowed by thick fog, a single line of small bare human footprints in the mud leading away from the house into the fog, warm lamplight spilling from the doorway onto the porch boards, no people
+  bedroom:
+    seed: 15
+    prompt: "Point of view from a bed in a small farmhouse bedroom at night: a man's hand in a grey wool sweater sleeve resting on the edge of a heavy patchwork quilt in the foreground, an oil lamp burning low on the nightstand at the left, a tall dark wooden wardrobe in the far corner with its doors shut, a closed bedroom door on the right with a thin line of light under it. an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps"
+  wardrobe_eye:
+    seed: 16
+    prompt: Extreme close-up of the narrow crack between the doors of a dark wooden wardrobe, total blackness inside, a single pale old woman's eye with a thin white eyebrow staring out from the darkness, wisps of white hair, warm lamplight grazing the wood grain
+  hall_back:
+    seed: 17
+    prompt: "Long narrow hallway inside an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps, seen from the open front door looking back into the house: an empty wooden rocking chair and an oil lamp halfway down, and at the far end an open bedroom doorway where a tall dark wooden wardrobe stands with its doors open onto pure blackness, no people"
+  silhouette:
+    seed: 18
+    prompt: "Seen from a foggy farmhouse porch at night: a man's dark silhouette standing in the open front doorway, completely backlit by a warm oil lamp inside, face in total shadow, short hair, sweater, the wood-panelled hallway glowing behind him"
+  hall_drag:
+    from: hallway
+    strength: 0.5
+    seed: 21
+    prompt: Long narrow farmhouse hallway at night, fresh drag marks smeared through the thick dust on the floorboards, leading along the floor toward the camera, oil lamp, empty rocking chair, oak front door at the end
+  door_hand_grandma:
+    from: door_inside
+    strength: 0.62
+    seed: 22
+    prompt: a thin wrinkled old woman's hand with a black cardigan sleeve resting on the brass handle of the heavy oak front door, yellowed note taped above, warm lamplight on her knuckles
+  door_hand_key:
+    from: door_inside
+    strength: 0.62
+    seed: 23
+    prompt: a man's hand in a grey wool sweater sleeve turning the old iron key in the lock of the heavy oak front door, yellowed note taped above, warm lamplight
+  bedroom_shadow:
+    from: bedroom
+    strength: 0.45
+    seed: 24
+    prompt: farmhouse bedroom at night, the line of light under the closed bedroom door broken by the dark shadow of two feet standing outside, oil lamp, wardrobe, quilt
+  hall_frame:
+    from: hallway
+    strength: 0.58
+    seed: 25
+    prompt: a man's hand in a grey wool sweater sleeve gripping the edge of a wooden door frame in the left foreground, looking down the long dark farmhouse hallway toward the oak front door
+  bedroom_open:
+    from: bedroom
+    strength: 0.62
+    seed: 26
+    prompt: farmhouse bedroom at night, the tall wardrobe in the corner now hangs wide open onto total blackness, long pale thin fingers curling around the edge of the wardrobe door, oil lamp guttering
+
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.
-    scene: the grandmother's hand resting on the brass handle of the oak front door
-    camera: tight close-up
-    evidence: lamplight on her knuckles
+    plate: door_hand_grandma
+    frame: [0.5, 0.55, 1.3]
   - text: The first knock is the wind. The second is the house settling.
-    scene: the oak front door at the end of the dark hallway, a thin line of light under the door
-    camera: wide from the far end of the hallway
+    plate: hallway
+    frame: [0.5, 0.42, 1.35]
     sfx: knock
   - text: The third is something that *learned* how to knock.
-    scene: the outside of the oak door, deep scratch marks in the wood
-    camera: extreme close-up
-    evidence: three parallel gouges at shoulder height
+    plate: door_outside
+    move: push_in
   - text: She died in March. Last week, I moved into her house.
-    scene: the narrator carrying a cardboard box into the dim hallway, her empty rocking chair in the corner
-    camera: medium shot from inside the doorway
+    plate: hallway
+    move: drift_right
   - text: Her rule was still taped inside the front door, in her handwriting.
-    scene: a yellowed handwritten note taped to the inside of the oak door
-    camera: close-up
-    evidence: the words never answer the third knock, in shaky handwriting
+    plate: door_inside
+    frame: [0.5, 0.35, 1.6]
   - text: Last night, at three in the morning, I heard one knock.
-    scene: the narrator lying awake in bed, eyes open, a dim lamp glowing on the nightstand
-    camera: overhead
+    plate: bedroom
     sfx: knock
     pause: 0.7
   - text: Then two.
-    scene: the hallway seen from the bedroom door, the front door far away in darkness
-    camera: wide, from the bedroom doorway
+    plate: hallway
+    frame: [0.5, 0.45, 1.8]
+    move: push_in
     pause: 0.9
   - text: I held my breath, and waited for the third.
-    scene: the narrator's face in darkness, half lit by a dying lamp, holding his breath
-    camera: extreme close-up
+    plate: bedroom
+    frame: [0.45, 0.78, 1.8]
     sfx: creak
   - text: It never came.
-    scene: the oak front door, perfectly still, at the end of the black hallway
-    camera: slow wide
+    plate: hallway
+    frame: [0.5, 0.42, 1.15]
+    move: pull_out
     pause: 1.0
   - text: Instead, something dragged itself along the hallway floor.
-    scene: the hallway floorboards, fresh drag marks through the dust leading toward the bedroom
-    camera: low angle along the floor
-    evidence: drag marks ending at the bedroom door
+    plate: hall_drag
+    frame: [0.5, 0.7, 1.5]
+    move: sink
   - text: It stopped outside my bedroom. Then it went *past*.
-    scene: the narrator sitting up in bed, staring at the gap under the bedroom door
-    camera: medium, from beside the bed
-    evidence: a shadow moving across the light under the door
+    plate: bedroom_shadow
+    frame: [0.75, 0.6, 1.7]
   - text: From inside my closet, I heard my grandmother's voice.
-    scene: the tall wardrobe in the bedroom, its door open a crack, total blackness inside
-    camera: wide, slightly low
+    plate: bedroom
+    frame: [0.5, 0.4, 1.5]
+    move: push_in
     impact: true
   - text: “Good. You remembered.”
-    scene: the grandmother's pale eye visible through the crack of the wardrobe door
-    camera: extreme close-up
+    plate: wardrobe_eye
+    move: push_in
   - text: “Now open the front door. Quickly. Before it finds the way in.”
-    scene: the narrator gripping the bedroom door frame, looking down the hallway toward the front door
-    camera: over the shoulder
+    plate: hall_frame
   - text: I ran for the door. Whatever was outside had stopped knocking.
-    scene: the narrator running down the dark hallway toward the oak door
-    camera: from behind, low
-    action: running, one hand reaching ahead
+    plate: hallway
+    frame: [0.5, 0.5, 1.1]
+    move: push_in
   - text: I turned the lock. And I pulled it open.
-    scene: the narrator's hand turning an old iron key in the oak door's lock
-    camera: tight close-up
-    action: turning the key
+    plate: door_hand_key
+    frame: [0.5, 0.6, 1.4]
   - text: The porch was empty. Just fog, and her footprints in the mud, leading *away* from the house.
-    scene: the empty porch at night in fog, a line of small bare footprints in the mud leading away
-    camera: wide from the doorway
-    evidence: footprints walking away from the house
+    plate: porch
+    move: rise
   - text: She hadn't been keeping something out.
-    scene: the narrator's face in the doorway, lit from behind by the oil lamp, realising
-    camera: close-up
+    plate: silhouette
+    move: push_in
     pause: 0.6
   - text: She'd been keeping it *in*.
-    scene: the hallway behind the narrator, the wardrobe's black doorway visible at the far end
-    camera: wide, looking back into the house
+    plate: hall_back
+    move: push_in
     pause: 0.8
   - text: Behind me, from inside the closet, came the third knock.
-    scene: the wardrobe door from inside the bedroom, its door now wide open, something long and pale in the darkness
-    camera: slow push toward the wardrobe
+    plate: bedroom_open
+    frame: [0.5, 0.4, 1.3]
+    move: push_in
     impact: true
     sfx: knock
 

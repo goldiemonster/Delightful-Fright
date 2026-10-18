@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
+SYNC_TOLERANCE = 0.25  # seconds a caption may lead or trail the voice it shows
 LINE_MIN_COVERAGE = 0.85  # share of a line's words the recogniser must hear
 VOICE_OVER_BED_DB = 8.0  # voice must sit this far above music + effects while speaking
 
@@ -37,8 +38,41 @@ def _black_frames(video: Path) -> list[tuple[float, float]]:
     return [(float(a), float(b)) for a, b in re.findall(r"black_start:([\d.]+) black_end:([\d.]+)", err)]
 
 
+def _voice_onsets(voice: np.ndarray, sr: int, timeline) -> list[float | None]:
+    """When each line's voice actually starts in the mix, from the voice stem's energy."""
+    hop = int(0.01 * sr)
+    onsets = []
+    for start, end, _ in timeline:
+        a, b = max(0, int((start - 0.5) * sr)), int(min(end, start + 1.5) * sr)
+        seg = voice[a:b]
+        if seg.size < hop * 3:
+            onsets.append(None)
+            continue
+        env = np.sqrt(np.convolve(seg**2, np.ones(hop * 2) / (hop * 2), mode="same"))[::hop]
+        above = np.nonzero(env > 0.15 * env.max())[0]
+        onsets.append(a / sr + above[0] * hop / sr if above.size else None)
+    return onsets
+
+
+def contact_sheet(video: Path, timeline, dest: Path, cols: int = 5):
+    """One frame from the middle of every shot, tiled, to review continuity at a glance."""
+    from PIL import Image, ImageDraw
+    w, h = 216, 384
+    rows = -(-len(timeline) // cols)
+    sheet = Image.new("RGB", (w * cols, h * rows))
+    draw = ImageDraw.Draw(sheet)
+    for i, (start, _, end) in enumerate(timeline):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{(start + end) / 2:.2f}", "-i", str(video),
+                              "-frames:v", "1", "-vf", f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                             capture_output=True).stdout
+        if len(raw) == w * h * 3:
+            sheet.paste(Image.frombytes("RGB", (w, h), raw), ((i % cols) * w, (i // cols) * h))
+        draw.text(((i % cols) * w + 6, (i // cols) * h + 6), str(i + 1), fill=(255, 220, 0))
+    sheet.save(dest, quality=85)
+
+
 def run(video: Path, lines: list[str], coverages: list[float | None], timeline, stems: dict, sr: int,
-        sources: list[str] = ()) -> bool:
+        sources: list[str] = (), word_times=None) -> bool:
     """Write qa.txt beside the video; return True when nothing FAILED."""
     checks = []
 
@@ -70,6 +104,15 @@ def run(video: Path, lines: list[str], coverages: list[float | None], timeline, 
     ratio = _db(_rms(voice[speaking])) - _db(_rms(bed[speaking]))
     check("Voice above music and effects", ratio >= VOICE_OVER_BED_DB, f"{ratio:.1f} dB (need {VOICE_OVER_BED_DB:.0f})")
 
+    # Captions in sync: each line's first caption word appears when its voice starts.
+    if word_times:
+        offsets = [(i + 1, words[0][0] - onset) for i, (words, onset)
+                   in enumerate(zip(word_times, _voice_onsets(voice, sr, timeline))) if words and onset is not None]
+        late = [(i, d) for i, d in offsets if abs(d) > SYNC_TOLERANCE]
+        worst = max((abs(d) for _, d in offsets), default=0.0)
+        check("Captions in sync", not late,
+              ", ".join(f"line {i} {d:+.2f}s" for i, d in late) or f"every line within {worst:.2f}s of its voice")
+
     # The ending: last line fully heard, and the last 10 seconds aren't dead air.
     tail = mix[-10 * sr:]
     tail_db = _db(_rms(tail))
@@ -92,8 +135,10 @@ def run(video: Path, lines: list[str], coverages: list[float | None], timeline, 
 
     width = max(len(n) for _, n, _ in checks)
     body = "\n".join(f"{v:10s} {n:{width}s}  {d}" for v, n, d in checks)
-    note = ("\n\nThese checks measure; they don't listen. Play the video once at 1.00x (and the stems in "
-            "stems/ if something sounds off) before publishing.\n")
+    note = ("\n\nThese checks measure; they don't listen or look. Check contact_sheet.jpg for the same faces, "
+            "rooms and props in every shot, then play the video once at 1.00x (and the stems in stems/ if "
+            "something sounds off) before publishing.\n")
     (video.parent / "qa.txt").write_text(body + note, encoding="utf-8")
+    contact_sheet(video, timeline, video.parent / "contact_sheet.jpg")
     print("  QA:\n    " + body.replace("\n", "\n    "))
     return all(v != "FAIL" for v, _, _ in checks)
