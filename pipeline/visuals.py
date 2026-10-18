@@ -130,11 +130,39 @@ _unreachable: set = set()
 PLACEHOLDER = "placeholder"  # the generated fog scene: not a story shot
 
 
+MIN_WARMTH = 0.04  # mean red minus blue; the channel's lamp-lit frames sit around 0.05-0.2, grey ones near 0
+
+
+def _warmth(img: Image.Image) -> float:
+    r, _, b = np.asarray(img.resize((64, 114)), float).reshape(-1, 3).mean(0) / 255
+    return float(r - b)
+
+
 def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | None:
     full = f"{prompt}. {style}"
     dest = cache / f"ai_{hashlib.sha1(f'{full}|{seed}'.encode()).hexdigest()[:16]}.jpg"
     if dest.exists():
         return dest
+    # FLUX sometimes paints these prompts in plain greys. Re-roll those up to twice, nudged
+    # towards colour, and keep the warmest, so every shot matches the channel's amber look.
+    best, ask, try_seed = None, full, seed
+    for tries_left in (2, 1, 0):
+        img = _generate(ask, try_seed)
+        if img is None:
+            break
+        if best is None or _warmth(img) > _warmth(best):
+            best = img
+        if _warmth(best) >= MIN_WARMTH or not tries_left:
+            break
+        print(f"  ! shot came out grey (warmth {_warmth(img):.2f}), repainting it")
+        ask, try_seed = f"{full}, rich warm colour", try_seed + 1000
+    if best is None:
+        return None
+    best.save(dest, quality=95)
+    return dest
+
+
+def _generate(full: str, seed: int) -> Image.Image | None:
     for source in (_huggingface, _pollinations, _aihorde):
         for attempt in range(4):
             if source in _unreachable:
@@ -152,8 +180,7 @@ def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | No
             if data is None:
                 break
             if _valid_image(data):
-                Image.open(io.BytesIO(data)).convert("RGB").save(dest, quality=95)
-                return dest
+                return Image.open(io.BytesIO(data)).convert("RGB")
             time.sleep(4)
     return None
 
