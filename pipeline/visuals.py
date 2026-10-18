@@ -2,7 +2,8 @@
 
 1. A file you dropped in assets/ (image or video): your own art or public-domain paintings.
 2. An AI-generated still from the line's shot prompt (free, no key needed:
-   Pollinations FLUX; or Hugging Face FLUX.1-schnell when HF_TOKEN is set).
+   Pollinations FLUX, then the AI Horde community cluster when Pollinations is
+   rate-limited; or Hugging Face FLUX.1-schnell when HF_TOKEN is set).
 3. A free stock clip from Pexels for the line's `visual` search (needs PEXELS_API_KEY).
 4. A generated foggy night scene, so a render never crashes. It shows nothing
    from the story, so QA fails any video that uses it.
@@ -101,6 +102,30 @@ def _pollinations(prompt: str, seed: int) -> bytes | None:
     return r.content
 
 
+def _aihorde(prompt: str, seed: int) -> bytes | None:
+    """AI Horde (aihorde.net): free volunteer GPUs. Slow for anonymous users, but it never runs out."""
+    api, key = "https://aihorde.net/api/v2", os.environ.get("AIHORDE_API_KEY", "0000000000")
+    headers = {"apikey": key, "Client-Agent": "delightful-fright:1:github"}
+    params = {"sampler_name": "k_euler", "cfg_scale": 1, "steps": 6, "width": 576, "height": 1024, "seed": str(seed), "n": 1}
+    body = {"prompt": prompt + " ### text, watermark, cartoon, anime, blurry, deformed hands", "params": params,
+            "models": ["Flux.1-Schnell fp8 (Compact)"], "r2": True, "nsfw": False, "censor_nsfw": True}
+    r = requests.post(f"{api}/generate/async", json=body, headers=headers, timeout=60)
+    r.raise_for_status()
+    job = r.json()["id"]
+    deadline = time.time() + 1200
+    while time.time() < deadline:
+        time.sleep(15)
+        s = requests.get(f"{api}/generate/check/{job}", headers=headers, timeout=30).json()
+        if s.get("faulted") or s.get("is_possible") is False:
+            raise requests.RequestException("AI Horde job faulted")
+        if s.get("done"):
+            gens = requests.get(f"{api}/generate/status/{job}", headers=headers, timeout=60).json()["generations"]
+            if not gens or gens[0].get("censored"):
+                raise requests.RequestException("AI Horde returned no image")
+            return requests.get(gens[0]["img"], timeout=120).content
+    raise requests.RequestException("AI Horde timed out")
+
+
 _unreachable: set = set()
 PLACEHOLDER = "placeholder"  # the generated fog scene: not a story shot
 
@@ -110,7 +135,7 @@ def fetch_ai_image(prompt: str, style: str, seed: int, cache: Path) -> Path | No
     dest = cache / f"ai_{hashlib.sha1(f'{full}|{seed}'.encode()).hexdigest()[:16]}.jpg"
     if dest.exists():
         return dest
-    for source in (_huggingface, _pollinations):
+    for source in (_huggingface, _pollinations, _aihorde):
         for attempt in range(4):
             if source in _unreachable:
                 break

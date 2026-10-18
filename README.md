@@ -10,7 +10,7 @@ captions, sound design) plus ready-to-paste upload text. Costs $0.
 | CEO / Head Writer | **You**: pick the stories, approve every upload | – |
 | Chief of Staff | Claude: drafts scripts with you, maintains this code | your existing plan |
 | Narrator | [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) TTS, voices can be blended (`bm_george:0.7,am_onyx:0.3`); or [Cartesia](https://cartesia.ai) Sonic (the channel's voices, e.g. Charlotte) with `cartesia_voice` + `CARTESIA_API_KEY`. Never time-stretched; EQ, compression and a small room | free / Cartesia plan |
-| Art Director | Gritty painted-realism stills in the channel's look (lamp-lit amber against blue-black shadows), built like the production bible's shot prompts (continuity `anchors` + `scene`, `camera`, `action`, `evidence`) ([Pollinations](https://pollinations.ai) FLUX, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
+| Art Director | Gritty painted-realism stills in the channel's look (lamp-lit amber against blue-black shadows), built like the production bible's shot prompts (continuity `anchors` + `scene`, `camera`, `action`, `evidence`) ([Pollinations](https://pollinations.ai) FLUX with [AI Horde](https://aihorde.net) as a free fallback, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
 | Camera | `pipeline/visuals.py`: smooth push-ins, pans and handheld drift, a faltering light on impacts, the channel's warm low-key grade, film grain | free |
 | Composer + Sound Designer | `pipeline/audio.py`: a generated eerie score (beating drone, drifting glass tones, moving air) that ducks under the voice and falls silent before impacts, a house that settles, knocks, creaks, low swells; or your own track | free |
 | Editor + Captions | FFmpeg + [faster-whisper](https://github.com/SYSTRAN/faster-whisper): captions timed to each spoken word with the current word lit, title card on the hook, mastered to YouTube's -14 LUFS | free |
@@ -49,6 +49,7 @@ Nothing is required: AI stills come free from Pollinations. Optional repo secret
 
 - `HF_TOKEN`: a free [Hugging Face token](https://huggingface.co/settings/tokens); stills then come from FLUX.1-schnell, which is faster and more reliable.
 - `POLLINATIONS_TOKEN`: a free [Pollinations token](https://auth.pollinations.ai) for higher rate limits.
+- `AIHORDE_API_KEY`: optional free [AI Horde key](https://aihorde.net/register). When Pollinations is rate-limited, stills come from AI Horde's volunteer GPUs; anonymous works but queues behind registered users.
 - `CARTESIA_API_KEY`: your [Cartesia](https://play.cartesia.ai) key, for stories that set `cartesia_voice`.
 - `PEXELS_API_KEY`: a free [Pexels key](https://www.pexels.com/api/), used for lines that have a `visual` search and no `scene`.
 
