@@ -47,8 +47,8 @@ anchors:
 # change (strength 0-1: how much may change), keeping its room and light.
 plates:
   hallway:
-    seed: 11
-    prompt: Long narrow hallway inside an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps. Seen from the far end of the hall at eye level, looking toward the heavy oak front door with a brass handle at the end of the hall, a thin line of pale light under the door. An oil lamp on a small side table halfway down, an empty wooden rocking chair beside it. Dusty floorboards, one-point perspective, no people
+    seed: 32
+    prompt: "Long narrow hallway inside an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps, one-point perspective, looking down the hall into the house: an empty wooden rocking chair beside a small table with an oil lamp halfway down, and at the very end of the hall an open bedroom doorway framing a tall dark wooden wardrobe whose two doors stand wide open onto pure pitch blackness, no people"
   door_inside:
     seed: 12
     prompt: "Close view of the inside of a heavy old oak front door in an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps: a brass door handle, an old iron key in the lock below it, and a yellowed handwritten paper note taped to the door at eye level. Warm lamplight from the left, deep shadows, no people"
@@ -56,68 +56,61 @@ plates:
     seed: 13
     prompt: Outside of a heavy old oak front door at night on a farmhouse porch, three deep parallel scratch gouges torn into the wood at shoulder height, cold fog, a faint warm glow of lamplight under the door, damp porch boards, no people
   porch:
-    seed: 14
-    prompt: View from an open farmhouse front doorway at night out onto an empty wooden porch and a muddy yard swallowed by thick fog, a single line of small bare human footprints in the mud leading away from the house into the fog, warm lamplight spilling from the doorway onto the porch boards, no people
+    seed: 32
+    prompt: "Looking out from an open farmhouse front doorway at night onto an empty wooden porch, porch steps down to a muddy yard swallowed by thick blue fog, a clear single line of small bare human footprints pressed into the wet mud leading away from the steps into the fog, warm amber lamplight spilling from the doorway across the porch boards, no people"
   bedroom:
     seed: 15
     prompt: "Point of view from a bed in a small farmhouse bedroom at night: a man's hand in a grey wool sweater sleeve resting on the edge of a heavy patchwork quilt in the foreground, an oil lamp burning low on the nightstand at the left, a tall dark wooden wardrobe in the far corner with its doors shut, a closed bedroom door on the right with a thin line of light under it. an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps"
   wardrobe_eye:
     seed: 16
     prompt: Extreme close-up of the narrow crack between the doors of a dark wooden wardrobe, total blackness inside, a single pale old woman's eye with a thin white eyebrow staring out from the darkness, wisps of white hair, warm lamplight grazing the wood grain
-  hall_back:
-    seed: 17
-    prompt: "Long narrow hallway inside an old isolated farmhouse at night, bare wide-plank wooden floors, dark wood-panelled walls, lit only by warm amber oil lamps, seen from the open front door looking back into the house: an empty wooden rocking chair and an oil lamp halfway down, and at the far end an open bedroom doorway where a tall dark wooden wardrobe stands with its doors open onto pure blackness, no people"
   silhouette:
     seed: 18
     prompt: "Seen from a foggy farmhouse porch at night: a man's dark silhouette standing in the open front doorway, completely backlit by a warm oil lamp inside, face in total shadow, short hair, sweater, the wood-panelled hallway glowing behind him"
   hall_drag:
     from: hallway
-    strength: 0.5
+    strength: 0.72
     seed: 21
     prompt: Long narrow farmhouse hallway at night, fresh drag marks smeared through the thick dust on the floorboards, leading along the floor toward the camera, oil lamp, empty rocking chair, oak front door at the end
   door_hand_grandma:
     from: door_inside
-    strength: 0.62
+    strength: 0.75
     seed: 22
     prompt: a thin wrinkled old woman's hand with a black cardigan sleeve resting on the brass handle of the heavy oak front door, yellowed note taped above, warm lamplight on her knuckles
-  door_hand_key:
-    from: door_inside
-    strength: 0.62
-    seed: 23
-    prompt: a man's hand in a grey wool sweater sleeve turning the old iron key in the lock of the heavy oak front door, yellowed note taped above, warm lamplight
   bedroom_shadow:
     from: bedroom
-    strength: 0.45
+    strength: 0.7
     seed: 24
     prompt: farmhouse bedroom at night, the line of light under the closed bedroom door broken by the dark shadow of two feet standing outside, oil lamp, wardrobe, quilt
   hall_frame:
     from: hallway
-    strength: 0.58
+    strength: 0.72
     seed: 25
     prompt: a man's hand in a grey wool sweater sleeve gripping the edge of a wooden door frame in the left foreground, looking down the long dark farmhouse hallway toward the oak front door
   bedroom_open:
     from: bedroom
-    strength: 0.62
+    strength: 0.75
     seed: 26
     prompt: farmhouse bedroom at night, the tall wardrobe in the corner now hangs wide open onto total blackness, long pale thin fingers curling around the edge of the wardrobe door, oil lamp guttering
 
 lines:
   - text: My grandmother had one rule. Never answer the *third* knock.
     plate: door_hand_grandma
-    frame: [0.5, 0.55, 1.3]
+    frame: [0.55, 0.45, 1.4]
   - text: The first knock is the wind. The second is the house settling.
     plate: hallway
     frame: [0.5, 0.42, 1.35]
     sfx: knock
   - text: The third is something that *learned* how to knock.
     plate: door_outside
+    frame: [0.5, 0.35, 1.5]
     move: push_in
   - text: She died in March. Last week, I moved into her house.
     plate: hallway
     move: drift_right
   - text: Her rule was still taped inside the front door, in her handwriting.
     plate: door_inside
-    frame: [0.5, 0.35, 1.6]
+    frame: [0.45, 0.4, 1.6]
   - text: Last night, at three in the morning, I heard one knock.
     plate: bedroom
     sfx: knock
@@ -155,11 +148,11 @@ lines:
     plate: hall_frame
   - text: I ran for the door. Whatever was outside had stopped knocking.
     plate: hallway
-    frame: [0.5, 0.5, 1.1]
+    frame: [0.45, 0.75, 1.6]
     move: push_in
   - text: I turned the lock. And I pulled it open.
-    plate: door_hand_key
-    frame: [0.5, 0.6, 1.4]
+    plate: door_inside
+    frame: [0.62, 0.45, 2.0]
   - text: The porch was empty. Just fog, and her footprints in the mud, leading *away* from the house.
     plate: porch
     move: rise
@@ -168,7 +161,8 @@ lines:
     move: push_in
     pause: 0.6
   - text: She'd been keeping it *in*.
-    plate: hall_back
+    plate: hallway
+    frame: [0.52, 0.5, 2.2]
     move: push_in
     pause: 0.8
   - text: Behind me, from inside the closet, came the third knock.
