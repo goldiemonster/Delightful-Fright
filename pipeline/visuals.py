@@ -29,7 +29,12 @@ IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 
 # Low-key and warm, like a room lit by one lamp (the channel's look); or cold, or sickly.
 GRADES = {
-    # Muted amber highlights over blue-grey shadows: the channel's ashcan-noir look.
+    # The channel's look: low key, warm lamp-lit highlights, cool near-black shadows, colour kept.
+    "channel": (
+        "eq=contrast=1.08:brightness=-0.03:saturation=0.92:gamma=0.94,"
+        "colorbalance=rs=-0.03:gs=0.0:bs=0.04:rm=0.03:bm=-0.03:rh=0.06:gh=0.02:bh=-0.06"
+    ),
+    # Muted amber highlights over blue-grey shadows, closer to black and white.
     "noir": (
         "eq=contrast=1.15:brightness=-0.04:saturation=0.55:gamma=0.92,"
         "colorbalance=rs=-0.04:gs=0.0:bs=0.06:rm=0.02:bm=-0.01:rh=0.08:gh=0.03:bh=-0.07"
@@ -41,12 +46,14 @@ GRADES = {
     "cold": "eq=contrast=1.15:brightness=-0.05:saturation=0.35,colorbalance=bs=0.08:bm=0.04:rs=-0.05",
     "green": "eq=contrast=1.2:brightness=-0.06:saturation=0.6,colorbalance=gs=0.06:gm=0.05:rs=-0.04:bh=-0.04",
 }
-FINISH = "noise=alls=8:allf=t+u,vignette=PI/4.2"
+FINISH = "noise=alls=6:allf=t+u,vignette=PI/4.5"
 
+# The channel's art direction: gritty, detailed, painterly realism lit by practical lamps.
 DEFAULT_STYLE = (
-    "Mature charcoal and graphite ashcan noir illustration, heavy cross-hatched shadows, "
-    "muted amber and blue-grey tones, rough paper grain, legible clues, single frame, "
-    "no collage, no text, no watermark"
+    "Warm-toned gritty cinematic digital painting, dark graphic novel realism, richly detailed textured brushwork, "
+    "ordinary adults in worn everyday clothes, warm amber practical light against deep blue-black shadows, "
+    "grime and damp reflective surfaces, low-key lighting, quiet unsettling mood, single frame, "
+    "no text, no watermark"
 )
 
 MOVES = ["push_in", "drift_left", "pull_out", "rise", "push_in", "drift_right", "sink"]
@@ -270,10 +277,10 @@ def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int)
             cy += slack_y * 0.8 * (0.5 - ease)
         elif move == "sink":
             cy -= slack_y * 0.8 * (0.5 - ease)
-        # Handheld drift: two slow sines per axis, a few pixels; a hard shake on impacts.
+        # Handheld drift: two slow sines per axis, a few pixels; a little unsteadiness on impacts.
         t = f / FPS
-        amp = 3.0 + (14.0 * np.exp(-t * 5) if shake else 0.0)
-        hz = 1.0 if not shake else 1.0 + 6 * np.exp(-t * 4)
+        amp = 3.0 + (4.0 * np.exp(-t * 2) if shake else 0.0)
+        hz = 1.0
         cx += amp * (np.sin(0.7 * hz * t + phase[0]) + 0.5 * np.sin(1.9 * hz * t + phase[1]))
         cy += amp * (np.sin(0.6 * hz * t + phase[2]) + 0.5 * np.sin(1.7 * hz * t + phase[3]))
         cx = min(max(cx, cw / 2), iw - cw / 2)
@@ -282,12 +289,13 @@ def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int)
         yield img.transform((W, H), Image.EXTENT, box, Image.BICUBIC).tobytes()
 
 
-def render_segment(src: Path, duration: float, dest: Path, grade: str = "noir", move: str = "push_in",
+def render_segment(src: Path, duration: float, dest: Path, grade: str = "channel", move: str = "push_in",
                    impact: bool = False, seed: int = 0):
     """Render one line's background as a 1080x1920 clip."""
-    look = f"{GRADES.get(grade, GRADES['noir'])},{FINISH}"
-    if impact:  # a white flash that decays as the boom hits
-        look += ",eq=brightness='if(lt(t,0.18),0.55*(1-t/0.18),0)':eval=frame"
+    look = f"{GRADES.get(grade, GRADES['channel'])},{FINISH}"
+    if impact:  # the light falters for a moment, like a lamp about to go out
+        look += (",eq=brightness='if(lt(t,0.7),-0.16*(gt(sin(47*t),0.2)+gt(sin(83*t+1),0.5))*(1-t/0.7),0)'"
+                 ":eval=frame")
     out = ["-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
            "-r", str(FPS), "-t", f"{duration:.3f}", str(dest)]
     if src.suffix.lower() in VIDEO_EXT:

@@ -76,7 +76,7 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     total = narration.size / sr
     print(f"  length: {total:.1f}s" + (f"  ! over {LONG_WARNING:.0f}s: consider trimming" if total > LONG_WARNING else ""))
 
-    # 2. Sound: processed voice, score (or your track), risers + booms on impacts, whooshes on cuts.
+    # 2. Sound: processed voice, an eerie score (or your track), a low swell under impacts, story effects.
     impacts = [timeline[i][0] for i, line in enumerate(lines) if i == 0 or line.get("impact")]
     cuts = [start for start, _, _ in timeline[1:]]
     sfx = []
@@ -89,7 +89,7 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
     music = story.get("music")
     music_path = ROOT / music if music and music not in ("auto", "none") else None
     mixed, stems = audio.mix(narration, sr, work, impacts, cuts, sfx, music_path,
-                             music_level=0.0 if music == "none" else float(story.get("music_level", 0.16)),
+                             music_level=0.0 if music == "none" else float(story.get("music_level", 0.14)),
                              room=story.get("ambience", "room"), seed=seed_base)
     sf.write(work / "audio.wav", mixed, sr)
     (out_dir / "stems").mkdir(exist_ok=True)
@@ -98,7 +98,7 @@ def render(story_path: Path, out_root: Path, engine: str, keep_work: bool) -> Pa
 
     # 3. Visuals: one shot per line.
     style = story.get("style", visuals.DEFAULT_STYLE)
-    grade = story.get("grade", "noir")
+    grade = story.get("grade", "channel")
     anchors = story.get("anchors") or ""
     used: set[int] = set()
     sources = []

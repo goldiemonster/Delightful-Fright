@@ -1,15 +1,16 @@
 """Shorts-style captions as an .ass subtitle file.
 
-Two or three words at a time, timed to the narrator's actual words, with the
-word being spoken lit up. Words wrapped in *asterisks* in the script are shown
-in blood red. The story title opens the video as a title card.
+Plain white words, two or three at a time in the lower third, timed to the
+narrator's actual words, the way the channel's Shorts caption. Words wrapped in
+*asterisks* in the script are shown in muted lamp amber. The story title opens
+the video as a quiet title card.
 """
 import re
 
 # ASS colours are &HAABBGGRR
 WHITE = "&H00FFFFFF&"
-ACTIVE = "&H0040C8FF&"  # warm candle amber
-RED = "&H002020E0&"
+ACTIVE = WHITE  # the spoken word isn't highlighted: calmer, like the channel
+EMPHASIS = "&H004FA8D8&"  # muted lamp amber
 GREY = "&H00B4B4B4&"
 
 
@@ -78,10 +79,9 @@ def build_ass(lines, path, title: str | None = None, title_end: float = 0.0,
                 if w_end <= w_start:
                     continue
                 body = " ".join(
-                    f"{{\\c{RED if e else ACTIVE if j == idx else WHITE}}}{_esc(w)}" for j, w, e in group
+                    f"{{\\c{EMPHASIS if e else ACTIVE if j == idx else WHITE}}}{_esc(w)}" for j, w, e in group
                 )
-                pop = r"{\fscx82\fscy82\t(0,80,\fscx100\fscy100)}" if pos == 0 else ""
-                events.append(f"Dialogue: 0,{_ts(w_start)},{_ts(w_end)},Cap,,0,0,0,,{pop}{body}")
+                events.append(f"Dialogue: 0,{_ts(w_start)},{_ts(w_end)},Cap,,0,0,0,,{body}")
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -92,8 +92,8 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{font},124,{WHITE},{WHITE},&H00000000&,&H80000000&,0,0,0,0,100,100,2,0,1,6,3,2,90,90,640,1
-Style: Title,{font},100,{WHITE},{WHITE},&H00000000&,&H80000000&,0,0,0,0,100,100,3,0,1,5,2,8,80,80,300,1
+Style: Cap,{font},84,{WHITE},{WHITE},&H00000000&,&H80000000&,0,0,0,0,100,100,2,0,1,4,2,2,90,90,560,1
+Style: Title,{font},84,{WHITE},{WHITE},&H00000000&,&H80000000&,0,0,0,0,100,100,3,0,1,4,2,8,80,80,300,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

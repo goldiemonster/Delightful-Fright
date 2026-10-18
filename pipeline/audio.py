@@ -1,4 +1,8 @@
-"""Sound: narrator processing, a generated horror score, and sound effects.
+"""Sound: narrator processing, a generated eerie score, and sound effects.
+
+The channel's sound is eerie rather than suspenseful: a low unresolved drone, faint
+high tones that drift in and out of tune, the house breathing, and long silences.
+No trailer risers, booms or whooshes unless a story asks for them by name.
 
 Everything here is synthesised in code, so there is no music licensing to worry
 about. Drop your own royalty-free track in assets/music/ and set `music:` in the
@@ -169,6 +173,31 @@ def static(sr: int, length: float = 1.5) -> np.ndarray:
     return _fade(out / (np.max(np.abs(out)) + 1e-9), sr, 0.05, 0.3).astype(np.float32)
 
 
+def swell(sr: int, length: float = 3.5) -> np.ndarray:
+    """A soft low swell that blooms into a moment and dies away: dread without a jump."""
+    t = _t(length, sr)
+    tone = sum(np.sin(2 * np.pi * f * t + k) for k, f in enumerate((55.0, 58.3, 82.4)))  # A1, a minor 2nd, E2
+    air = _bandpass(np.random.default_rng(4).standard_normal(t.size), sr, 150, 900) * 0.4
+    env = np.sin(np.pi * np.clip(t / length, 0, 1)) ** 2
+    out = reverb((tone / 3 + air) * env, sr, seconds=3.0, wet=0.5, damp_hz=1500)
+    return (out / (np.max(np.abs(out)) + 1e-9)).astype(np.float32)
+
+
+def creak(sr: int, length: float = 1.4) -> np.ndarray:
+    """An old floorboard or door hinge giving way slowly."""
+    t = _t(length, sr)
+    rng = np.random.default_rng(6)
+    rate = 18 + 22 * np.sin(np.pi * t / length)  # stick-slip ticks that speed up then slow
+    ticks = np.zeros(t.size)
+    at = 0.0
+    while at < length:
+        ticks[int(at * sr)] = rng.uniform(0.5, 1)
+        at += 1 / rate[min(int(at * sr), t.size - 1)]
+    body = np.convolve(ticks, np.sin(2 * np.pi * 310 * _t(0.03, sr)) * np.exp(-_t(0.03, sr) * 120), mode="same")
+    out = _bandpass(body, sr, 180, 2400) * np.sin(np.pi * t / length)
+    return reverb(out / (np.max(np.abs(out)) + 1e-9), sr, seconds=1.0, wet=0.3).astype(np.float32)
+
+
 def ambience(kind: str, duration: float, sr: int, seed: int = 0) -> np.ndarray:
     """A bed of room tone under everything: rain, wind, an empty room, or nothing."""
     rng = np.random.default_rng(seed + 11)
@@ -182,15 +211,21 @@ def ambience(kind: str, duration: float, sr: int, seed: int = 0) -> np.ndarray:
         sweep = 0.5 + 0.5 * np.sin(2 * np.pi * 0.06 * t + rng.uniform(0, 6))
         out = _lowpass(noise, sr, 500) * (0.4 + sweep) + _bandpass(noise, sr, 700, 1400) * sweep**3 * 0.4
     elif kind == "room":
-        out = _lowpass(noise, sr, 300) * 0.6 + 0.05 * np.sin(2 * np.pi * 60 * t)  # air and a fridge hum
+        # Still air, a faint electrical hum, and the house settling now and then.
+        out = _lowpass(noise, sr, 300) * 0.6 + 0.04 * np.sin(2 * np.pi * 60 * t)
+        settle = _peak1(creak(sr)) * 0.5
+        at = float(rng.uniform(6, 12))
+        while at < duration - 2:
+            _place(out, settle * float(rng.uniform(0.3, 0.8)), at, sr)
+            at += float(rng.uniform(12, 22))
     else:
         return np.zeros(t.size, dtype=np.float32)
     out = _fade(out, sr, 1.0, 1.5)
     return (out / (np.max(np.abs(out)) + 1e-9)).astype(np.float32)
 
 
-SFX = {"boom": boom, "riser": riser, "whoosh": whoosh, "knock": knock,
-       "heartbeat": heartbeat, "bell": bell, "static": static}
+SFX = {"boom": boom, "riser": riser, "whoosh": whoosh, "knock": knock, "heartbeat": heartbeat,
+       "bell": bell, "static": static, "swell": swell, "creak": creak}
 
 
 # ---------------------------------------------------------------- score
@@ -206,45 +241,46 @@ def _tone(freq: float, t: np.ndarray, harmonics: int = 6, detune: float = 0.0) -
 
 
 def score(duration: float, sr: int, seed: int, impacts: list[float]) -> np.ndarray:
-    """A slow, dissonant ambient bed: drone, breathing pad, sparse piano, sub pulses."""
+    """An eerie bed that never resolves: a beating low drone, slow breath of air, and faint
+    high tones that drift in and out of tune. It goes quiet just before each impact."""
     rng = np.random.default_rng(seed)
     t = _t(duration, sr)
     root = float(rng.choice([43.65, 46.25, 49.0, 51.91, 55.0]))  # F1 .. A1
 
-    drone = _tone(root, t, harmonics=4, detune=0.004) * 0.5 + _tone(root * 1.5, t, harmonics=3, detune=0.006) * 0.2
-    drone = _lowpass(drone, sr, 220)
+    # Drone: the root against a note a minor second above it, so the two slowly beat.
+    drone = _tone(root, t, harmonics=3, detune=0.003) * 0.5 + _tone(root * 16 / 15, t, harmonics=2) * 0.22
+    drone = _lowpass(drone, sr, 180) * (0.8 + 0.2 * np.sin(2 * np.pi * 0.05 * t + rng.uniform(0, 6)))
 
-    # Pad: minor chord plus a cluster note that slowly fades in and out of tune.
-    pad = sum(_tone(root * 4 * r, t, harmonics=5, detune=0.003) for r in (1.0, 1.189, 1.498))
-    pad += 0.6 * _tone(root * 4 * 1.414, t, harmonics=4, detune=0.008) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.03 * t))
-    breath = 0.55 + 0.45 * np.sin(2 * np.pi * (1 / 9) * t + rng.uniform(0, 6))
-    pad = _lowpass(pad, sr, 900) * breath * 0.18
+    # Air moving through an old house: band-limited noise that rises and falls very slowly.
+    air = _bandpass(rng.standard_normal(t.size), sr, 250, 1100)
+    air *= 0.25 * (0.5 + 0.5 * np.sin(2 * np.pi * 0.035 * t + rng.uniform(0, 6))) ** 2
 
-    # Sparse piano: a falling minor motif, one note every few seconds, drenched in reverb.
-    piano = np.zeros(t.size)
-    scale = [1.0, 1.189, 1.335, 1.498, 1.587, 2.0]
-    at = 2.5
-    note_t = _t(4.0, sr)
-    while at < duration - 3:
-        f = root * 8 * float(rng.choice(scale)) * float(rng.choice([1, 0.5]))
-        note = sum(np.sin(2 * np.pi * f * n * note_t) * np.exp(-note_t * (1.2 + n * 0.9)) / n**1.5 for n in range(1, 6))
-        _place(piano, note * np.minimum(1, note_t / 0.004), at, sr, 0.3)
-        at += float(rng.uniform(3.0, 6.5))
-    piano = reverb(piano, sr, seconds=4.0, wet=0.55, damp_hz=3500)
+    # Glass tones: high pure notes a tritone apart, each fading in and out over many seconds
+    # and wavering in pitch, like a wet finger on a glass rim in another room.
+    glass = np.zeros(t.size)
+    at = float(rng.uniform(1, 4))
+    while at < duration - 4:
+        length = float(rng.uniform(6, 11))
+        nt = _t(min(length, duration - at), sr)
+        f = root * 16 * float(rng.choice([1.0, 1.414, 1.5, 1.888]))
+        wobble = 1 + 0.004 * np.sin(2 * np.pi * float(rng.uniform(0.15, 0.4)) * nt)
+        note = np.sin(2 * np.pi * np.cumsum(f * wobble) / sr) * np.sin(np.pi * nt / length) ** 2
+        _place(glass, note, at, sr, 0.12)
+        at += float(rng.uniform(5, 9))
+    glass = reverb(glass, sr, seconds=4.5, wet=0.6, damp_hz=4000)
 
-    bed = drone + pad + piano
-    bed = reverb(bed, sr, seconds=3.0, wet=0.3, damp_hz=3000)
+    bed = reverb(drone + air + glass, sr, seconds=3.5, wet=0.35, damp_hz=2500)
 
-    # Pull the bed out just before each impact so the hit lands in near-silence.
+    # Silence is the scare: the bed falls away before each impact and creeps back after.
     env = np.ones(t.size)
     for hit in impacts:
-        a, b, c = int((hit - 1.0) * sr), int(hit * sr), int((hit + 2.5) * sr)
+        a, b, c = int((hit - 1.5) * sr), int((hit + 0.2) * sr), int((hit + 4.0) * sr)
         if 0 < a and b < env.size:
-            env[a:b] = np.minimum(env[a:b], np.linspace(1, 0.15, b - a))
+            env[a:b] = np.minimum(env[a:b], np.linspace(1, 0.08, b - a))
             n = env[b:c].size
-            env[b:c] = np.minimum(env[b:c], np.linspace(0.15, 1, c - b)[:n])
+            env[b:c] = np.minimum(env[b:c], np.linspace(0.08, 1, c - b)[:n])
     bed *= env
-    bed = _fade(bed, sr, 1.5, 2.0)
+    bed = _fade(bed, sr, 2.5, 3.0)
     return (bed / (np.max(np.abs(bed)) + 1e-9)).astype(np.float32)
 
 
@@ -273,7 +309,7 @@ def _duck(narration: np.ndarray, sr: int, depth: float) -> np.ndarray:
 
 
 def mix(narration: np.ndarray, sr: int, work: Path, impacts: list[float], cuts: list[float],
-        sfx: list[tuple[float, str]], music: Path | None = None, music_level: float = 0.16,
+        sfx: list[tuple[float, str]], music: Path | None = None, music_level: float = 0.14,
         room: str = "room", seed: int = 0) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """The final mix, plus its stems (voice, music, effects) at the same scale for review."""
     total = narration.size
@@ -281,19 +317,17 @@ def mix(narration: np.ndarray, sr: int, work: Path, impacts: list[float], cuts: 
     voice = _fit(voice, total)
 
     bed = _fit(load_music(music, total / sr, sr) if music else score(total / sr, sr, seed, impacts), total)
-    bed = bed * _duck(narration, sr, depth=0.6) * music_level
+    bed = bed * _duck(narration, sr, depth=0.5) * music_level
 
+    # Impacts get a low swell that peaks as the line lands; cuts get nothing (no whooshes).
     fx = np.zeros(total, dtype=np.float32)
-    hit, rise, swish = _peak1(boom(sr)), riser(sr), whoosh(sr)
+    rise = swell(sr)
     for at in impacts:
-        _place(fx, rise, at - rise.size / sr, sr, 0.22)
-        _place(fx, hit, at, sr, 0.3)
-    for at in cuts:
-        _place(fx, swish, at - 0.35, sr, 0.06)
+        _place(fx, rise, at - 0.55 * rise.size / sr, sr, 0.16)
     for at, name in sfx:
-        _place(fx, _peak1(SFX[name](sr)), at, sr, 0.14)
+        _place(fx, _peak1(SFX[name](sr)), at, sr, 0.12)
 
-    fx += _fit(ambience(room, total / sr, sr, seed), total) * _duck(narration, sr, depth=0.3) * 0.07
+    fx += _fit(ambience(room, total / sr, sr, seed), total) * _duck(narration, sr, depth=0.3) * 0.09
 
     stems = {"voice": voice, "music": bed, "effects": fx}
     out = voice + bed + fx

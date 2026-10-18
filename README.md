@@ -10,9 +10,9 @@ captions, sound design) plus ready-to-paste upload text. Costs $0.
 | CEO / Head Writer | **You**: pick the stories, approve every upload | – |
 | Chief of Staff | Claude: drafts scripts with you, maintains this code | your existing plan |
 | Narrator | [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) TTS, voices can be blended (`bm_george:0.7,am_onyx:0.3`); or [Cartesia](https://cartesia.ai) Sonic (the channel's voices, e.g. Charlotte) with `cartesia_voice` + `CARTESIA_API_KEY`. Never time-stretched; EQ, compression and a small room | free / Cartesia plan |
-| Art Director | Charcoal/graphite ashcan-noir stills built like the production bible's shot prompts (continuity `anchors` + `scene`, `camera`, `action`, `evidence`) ([Pollinations](https://pollinations.ai) FLUX, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
-| Camera | `pipeline/visuals.py`: smooth push-ins, pans and handheld drift, camera shake and a flash on impacts, muted amber over blue-grey grade, film grain | free |
-| Composer + Sound Designer | `pipeline/audio.py`: a generated dark score (drone, pad, sparse piano) that ducks under the voice, room/rain/wind ambience, risers into booms, knocks, heartbeats, bells; or your own track | free |
+| Art Director | Gritty painted-realism stills in the channel's look (lamp-lit amber against blue-black shadows), built like the production bible's shot prompts (continuity `anchors` + `scene`, `camera`, `action`, `evidence`) ([Pollinations](https://pollinations.ai) FLUX, or Hugging Face FLUX.1-schnell with `HF_TOKEN`); your own art in `assets/`; [Pexels](https://www.pexels.com/api/) footage | free |
+| Camera | `pipeline/visuals.py`: smooth push-ins, pans and handheld drift, a faltering light on impacts, the channel's warm low-key grade, film grain | free |
+| Composer + Sound Designer | `pipeline/audio.py`: a generated eerie score (beating drone, drifting glass tones, moving air) that ducks under the voice and falls silent before impacts, a house that settles, knocks, creaks, low swells; or your own track | free |
 | Editor + Captions | FFmpeg + [faster-whisper](https://github.com/SYSTRAN/faster-whisper): captions timed to each spoken word with the current word lit, title card on the hook, mastered to YouTube's -14 LUFS | free |
 | QA | `pipeline/qa.py`: re-listens to every line with speech recognition (complete, in order), checks loudness, true peak, voice over music, the last 10 seconds and black frames; writes `qa.txt` and exports voice/music/effects stems for a listening pass | free |
 | Render Farm | GitHub Actions (2,000 free minutes/month on private repos; about 8–12 min per Short) | free |
@@ -33,7 +33,7 @@ You can also re-render any story from **Actions → Render Shorts → Run workfl
 - **One shot per line.** Describe each character once in `anchors` and the place and light in
   `anchors.world`; give each line a `scene` that names who is in it ("the narrator ..."), and,
   when it matters, a `camera`, a single `action`, and the `evidence` that must be visible.
-- Use `*asterisks*` for red words, `impact: true` for a riser + boom + flash, `sfx: knock` for sound
+- Use `*asterisks*` for amber words, `impact: true` for a silence, low swell and faltering light, `sfx: knock` for sound
   effects, and `pause: 0.8` for silence. See the top of the sample story for every option.
 
 ### Before you publish
