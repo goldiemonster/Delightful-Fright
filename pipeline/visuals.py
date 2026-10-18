@@ -303,10 +303,26 @@ def resolve(line: dict, style: str, seed: int, cache: Path, used: set[int], anch
     return generate_scene(seed, cache / f"scene_{seed}.jpg"), PLACEHOLDER
 
 
+EXPOSURE = 0.17  # mean luminance a still is lifted to before the grade; the channel's frames sit at ~0.1-0.25
+
+
+def _expose(img: Image.Image) -> Image.Image:
+    """Lift a too-dark still with a gamma curve so it reads on a phone after the low-key grade.
+    Shadows stay deep and colours keep their balance; bright stills are left alone."""
+    lum = lambda im: float((np.asarray(im.resize((54, 96)), float) / 255 @ [0.299, 0.587, 0.114]).mean())
+    g = 1.0
+    for _ in range(3):
+        mean = lum(img.point([round(255 * (i / 255) ** g) for i in range(256)] * 3)) if g < 1 else lum(img)
+        if mean >= EXPOSURE - 0.01 or g <= 0.45:
+            break
+        g = max(0.45, g * np.log(EXPOSURE) / np.log(max(mean, 1e-3)))
+    return img if g >= 1 else img.point([round(255 * (i / 255) ** g) for i in range(256)] * 3)
+
+
 def _still_frames(src: Path, duration: float, move: str, shake: bool, seed: int):
     """Yield raw RGB frames of a slow camera move over a still image."""
     frames = max(1, round(duration * FPS))
-    img = Image.open(src).convert("RGB")
+    img = _expose(Image.open(src).convert("RGB"))
     # Cover the frame with 16% headroom so the camera can move without showing edges.
     scale = max(W / img.width, H / img.height) * 1.16
     img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
